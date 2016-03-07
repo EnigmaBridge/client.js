@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Enigma Bridge REST demo</title>
+    <style>
+        body,div,p,a,td,input {font-family: Arial, Helvetica, sans-serif; font-size: 10pt;}
+        h1 {font-size: 14pt; }
+        h2 {font-size: 12pt; }
+        #footer {font-size: 8pt; text-align: center; padding: 0 10px 10px 10px}
+        #status {background-color: #C1C1FF; padding: 10px 10px 10px 10px; font-family: monospace;  white-space: pre; margin-top: 10px;}
+        .preformatted { font-family: monospace;  white-space: pre;}
+    </style>
+    <script src="jquery-1.12.1.min.js"></script>
+    <script src="sprintf.js"></script>
+    <script src="enigma.js"></script>
+</head>
+<body>
+
+<form name="dataPost">
+    <label for="data">Data: </label>
+    <input type="text" id="data" name="data" size="80" title="Data"/>
+    <input type="submit" value="Submit"/>
+</form>
+<div id="status"></div>
+
+<script>
+    function display_message(msg)
+    {
+        //alert(msg);
+        //document.getElementById("status").innerHTML = msg;
+        $("#status")[0].innerHTML = msg;
+    }
+
+    function doRequest(data)
+    {
+        // Sanity checks
+        if (!data)
+            return display_message("Data is empty");
+
+        //<userAPI>/<version>/ProcessData/<nonce>/<data_hex>;
+//        var apiKey = "API_TEST0000005544";
+        var apiKey = "API_TEST";
+        var apiVersion = "1.0";
+        var command = "ProcessData";
+        var userObjectID = "00005544";
+        var nonce = "123456789";
+        var userData = data.hexEncode();
+
+        var endpointUrl = sprintf("https://smarthsm.net:11180/%s/%s/%s/%s/%s",
+                apiKey, apiVersion, command, userObjectID, nonce);
+        console.log("URL: " + endpointUrl);
+        console.log("UserData: " + userData);
+
+        $.ajax({
+            url: endpointUrl,
+            type: 'POST',
+//            crossDomain: true,
+            dataType: 'json',
+            data: {data: userData},
+            success: function (response) {
+                display_message(response);
+                //jQuery("#usergrid").trigger("reloadGrid");
+                //alert("Details saved successfully!!!");
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                display_message(sprintf("Error: status=%d, responseText: %s, error: %s", xhr.status, xhr.responseText, thrownError));
+            }
+        });
+    }
+
+    $(function(){
+        $('form[name=dataPost]').submit(function(){
+            doRequest($(this).find('#data').val());
+            return false;
+        });
+    });
+
+</script>
+
+</body>
+</html>
