@@ -13,6 +13,7 @@
     </style>
     <script src="jquery-1.12.1.min.js"></script>
     <script src="sprintf.js"></script>
+    <script src="sjcl.js"></script>
     <script src="enigma.js"></script>
 </head>
 <body>
@@ -25,6 +26,9 @@
 <div id="status"></div>
 
 <script>
+    // When developing locally, you can use socat to bypass same origin policy:
+    // socat TCP-LISTEN:11180,fork TCP:enigmabridge.com:11180
+
     function display_message(msg)
     {
         //alert(msg);
@@ -38,38 +42,49 @@
         if (!data)
             return display_message("Data is empty");
 
-        //<userAPI>/<version>/ProcessData/<nonce>/<data_hex>;
-//        var apiKey = "API_TEST0000005544";
-        var apiKey = "API_TEST";
+        //<userAPI>/<version>/ProcessData/<nonce>
+        var apiKey = "API_TEST0000005544";
         var apiVersion = "1.0";
         var command = "ProcessData";
-        var userObjectID = "00005544";
-        var nonce = "123456789";
-        var userData = data.hexEncode();
+        var userObjectID = "0000005544";
+        var nonce = ebGenNonce(16);
+//        var userData = data.hexEncode();
+        var userData = "Packet0_PLAINAES_00004bcd596b3afe9ab1ca440061edcb41729c5a700afdb611175f7543cafcc0e69ee2f07a1b8bf7a9e729523eb38af5f90a";
 
-        var endpointUrl = sprintf("https://smarthsm.net:11180/%s/%s/%s/%s/%s",
-                apiKey, apiVersion, command, userObjectID, nonce);
+        var endpointUrl = sprintf("https://smarthsm.net:11180/%s/%s/%s/%s",
+                apiKey, apiVersion, command, nonce);
         console.log("URL: " + endpointUrl);
         console.log("UserData: " + userData);
 
+        // Do the remote call
         $.ajax({
             url: endpointUrl,
             type: 'POST',
-//            crossDomain: true,
             dataType: 'json',
             data: {data: userData},
-            success: function (response) {
-                display_message(response);
+            timeout: 7000,
+
+            done: function (data, textStatus, jqXHR) {
+                console.log("Done: " + data);
+                display_message(data);
                 //jQuery("#usergrid").trigger("reloadGrid");
-                //alert("Details saved successfully!!!");
             },
             error: function (xhr, ajaxOptions, thrownError) {
-                display_message(sprintf("Error: status=%d, responseText: %s, error: %s", xhr.status, xhr.responseText, thrownError));
+                var msg = sprintf("Error: status=%d, responseText: %s, error: %s", xhr.status, xhr.responseText, thrownError);
+                console.log("Error: " + msg);
+                display_message(msg);
+            },
+            always: function() {
+                console.log("Complete");
             }
         });
     }
 
     $(function(){
+        // Start random number collectors.
+        sjcl.random.startCollectors();
+
+        // Submit button action.
         $('form[name=dataPost]').submit(function(){
             doRequest($(this).find('#data').val());
             return false;
