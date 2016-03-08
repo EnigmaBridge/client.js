@@ -249,10 +249,29 @@ eb.comm.requestBuilder = function(nonce, aesKey, macKey, userObjectId, reqType){
 };
 
 eb.comm.requestBuilder.prototype = {
+    /**
+     * User object ID, integer type.
+     */
     userObjectId : -1,
+
+    /**
+     * AES communication encryption key, hexcoded string.
+     */
     aesKey: "",
+
+    /**
+     * AES MAC communication key, hexcoded string.
+     */
     macKey: "",
+
+    /**
+     * Freshness nonce / IV, hexcoded string.
+     */
     nonce: "",
+
+    /**
+     * Request type. PLAINAES by default.
+     */
     reqType: "",
 
     genNonce: function(){
@@ -260,6 +279,13 @@ eb.comm.requestBuilder.prototype = {
         return this.nonce;
     },
 
+    /**
+     * Builds EB request.
+     *
+     * @param plainData - bitArray of the plaintext data (will be MAC protected).
+     * @param requestData - bitArray with userdata to perform operation on (will be encrypted, MAC protected)
+     * @returns request body string.
+     */
     build: function(plainData, requestData){
         this.nonce = this.nonce || eb.misc.genHexNonce(16);
 
