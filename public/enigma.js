@@ -1,3 +1,8 @@
+/**
+ * EnigmaBridge API helper functions.
+ */
+
+
 String.prototype.hexEncode = function(){
     var hex, i;
 
@@ -148,7 +153,7 @@ sjcl.misc.hmac_cbc.prototype.encrypt = sjcl.misc.hmac_cbc.prototype.mac = functi
     var bsb = this._bs << 3;
 
     data = this._padding.pad(data, this._bs);
-    c = sjcl.codec.hex.toBits('00'.repeat(this._bs));
+    var c = sjcl.codec.hex.toBits('00'.repeat(this._bs));
     for (i = 0; bp + bsb <= bl; i += 4, bp += bsb) {
         c = this._cipher.encrypt(xor(c, data.slice(i, i + 4)));
     }
@@ -161,27 +166,36 @@ sjcl.misc.hmac_cbc.prototype.encrypt = sjcl.misc.hmac_cbc.prototype.mac = functi
  */
 sjcl.mode.cbc = {
     name: "cbc",
-    encrypt: function (a, b, c, d) {
+    encrypt: function (a, b, c, d, noPad) {
         if (d && d.length) {
             throw new sjcl.exception.invalid("cbc can't authenticate data");
         }
         if (sjcl.bitArray.bitLength(c) !== 128) {
             throw new sjcl.exception.invalid("cbc iv must be 128 bits");
         }
+
         var i, w = sjcl.bitArray, bl = w.bitLength(b), bp = 0, output = [], xor = eb.misc.xor;
+        if (noPad && (bl & 127) != 0){
+            throw new sjcl.exception.invalid("when padding is disabled, plaintext has to be a positive multiple of a block size");
+        }
         if ((bl & 7) != 0) {
             throw new sjcl.exception.invalid("pkcs#5 padding only works for multiples of a byte");
         }
+
         for (i = 0; bp + 128 <= bl; i += 4, bp += 128) {
             c = a.encrypt(xor(c, b.slice(i, i + 4)));
             output.splice(i, 0, c[0], c[1], c[2], c[3]);
         }
-        bl = (16 - ((bl >> 3) & 15)) * 0x1010101;
-        c = a.encrypt(xor(c, w.concat(b, [bl, bl, bl, bl]).slice(i, i + 4)));
-        output.splice(i, 0, c[0], c[1], c[2], c[3]);
+
+        if (!noPad){
+            bl = (16 - ((bl >> 3) & 15)) * 0x1010101;
+            c = a.encrypt(xor(c, w.concat(b, [bl, bl, bl, bl]).slice(i, i + 4)));
+            output.splice(i, 0, c[0], c[1], c[2], c[3]);
+        }
+
         return output;
     },
-    decrypt: function (a, b, c, d) {
+    decrypt: function (a, b, c, d, noPad) {
         if (d && d.length) {
             throw new sjcl.exception.invalid("cbc can't authenticate data");
         }
@@ -199,15 +213,19 @@ sjcl.mode.cbc = {
             output.splice(i, 0, bo[0], bo[1], bo[2], bo[3]);
             c = bi;
         }
-        bi = output[i - 1] & 255;
-        if (bi == 0 || bi > 16) {
-            throw new sjcl.exception.corrupt("pkcs#5 padding corrupt");
+        if (!noPad) {
+            bi = output[i - 1] & 255;
+            if (bi == 0 || bi > 16) {
+                throw new sjcl.exception.corrupt("pkcs#5 padding corrupt");
+            }
+            bo = bi * 0x1010101;
+            if (!w.equal(w.bitSlice([bo, bo, bo, bo], 0, bi << 3), w.bitSlice(output, (output.length << 5) - (bi << 3), output.length << 5))) {
+                throw new sjcl.exception.corrupt("pkcs#5 padding corrupt");
+            }
+            return w.bitSlice(output, 0, (output.length << 5) - (bi << 3));
+        } else {
+            return output;
         }
-        bo = bi * 0x1010101;
-        if (!w.equal(w.bitSlice([bo, bo, bo, bo], 0, bi << 3), w.bitSlice(output, (output.length << 5) - (bi << 3), output.length << 5))) {
-            throw new sjcl.exception.corrupt("pkcs#5 padding corrupt");
-        }
-        return w.bitSlice(output, 0, (output.length << 5) - (bi << 3));
     }
 };
 
@@ -284,12 +302,12 @@ eb.comm.requestBuilder.prototype = {
 
         aes = new sjcl.cipher.aes(aesKeyBits);
         aesMac = new sjcl.cipher.aes(macKeyBits);
-        hmac = new sjcl.misc.hmac_cbc(aesMac);
+        hmac = new sjcl.misc.hmac_cbc(aesMac, 16, eb.padding.empty);
 
         // IV is null, nonce in the first block is kind of IV.
         var IV = h.toBits('00'.repeat(16));
-        var encryptedData = sjcl.mode.cbc.encrypt(aes, baBuff, IV, []);
-        console.log("encrypted: " + h.fromBits(encryptedData));
+        var encryptedData = sjcl.mode.cbc.encrypt(aes, baBuff, IV, [], true);
+        console.log("encrypted: " + h.fromBits(encryptedData) + ", len=" + ba.bitLength(encryptedData));
 
         // include plain data in the MAC if non-empty.
         var toMac = encryptedData;
