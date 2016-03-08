@@ -21,9 +21,16 @@ String.prototype.hexDecode = function(){
     return back;
 };
 
-function ebGenNonce(length){
+function ebGenHexNonce(length){
+    return ebGenNonce(length, "0123456789abcdef");
+}
+
+function ebGenAlphaNonce(length){
+    return ebGenNonce(length, "0123456789abcdefghijklmnopqrstuvwxyz");
+}
+
+function ebGenNonce(length, alphabet){
     var nonce = "";
-    var alphabet = "0123456789abcdefghijklmnopqrstuvwxyz";
     var alphabetLen = alphabet.length;
     var i = 0;
 
@@ -33,3 +40,58 @@ function ebGenNonce(length){
 
     return nonce;
 }
+
+function xor(x,y) {
+    return [x[0]^y[0],x[1]^y[1],x[2]^y[2],x[3]^y[3]];
+}
+
+sjcl.mode.cbc = {
+    name: "cbc", encrypt: function (a, b, c, d) {
+        if (d && d.length) {
+            throw new sjcl.exception.invalid("cbc can't authenticate data");
+        }
+        if (sjcl.bitArray.bitLength(c) !== 128) {
+            throw new sjcl.exception.invalid("cbc iv must be 128 bits");
+        }
+        var i, w = sjcl.bitArray, bl = w.bitLength(b), bp = 0, output = [];
+        if (bl & 7) {
+            throw new sjcl.exception.invalid("pkcs#5 padding only works for multiples of a byte");
+        }
+        for (i = 0; bp + 128 <= bl; i += 4, bp += 128) {
+            c = a.encrypt(xor(c, b.slice(i, i + 4)));
+            output.splice(i, 0, c[0], c[1], c[2], c[3]);
+        }
+        bl = (16 - ((bl >> 3) & 15)) * 0x1010101;
+        c = a.encrypt(xor(c, w.concat(b, [bl, bl, bl, bl]).slice(i, i + 4)));
+        output.splice(i, 0, c[0], c[1], c[2], c[3]);
+        return output;
+    },
+    decrypt: function (a, b, c, d) {
+        if (d && d.length) {
+            throw new sjcl.exception.invalid("cbc can't authenticate data");
+        }
+        if (sjcl.bitArray.bitLength(c) !== 128) {
+            throw new sjcl.exception.invalid("cbc iv must be 128 bits");
+        }
+        if ((sjcl.bitArray.bitLength(b) & 127) || !b.length) {
+            throw new sjcl.exception.corrupt("cbc ciphertext must be a positive multiple of the block size");
+        }
+        var i, w = sjcl.bitArray, bi, bo, output = [];
+        d = d || [];
+        for (i = 0; i < b.length; i += 4) {
+            bi = b.slice(i, i + 4);
+            bo = xor(c, a.decrypt(bi));
+            output.splice(i, 0, bo[0], bo[1], bo[2], bo[3]);
+            c = bi;
+        }
+        bi = output[i - 1] & 255;
+        if (bi == 0 || bi > 16) {
+            throw new sjcl.exception.corrupt("pkcs#5 padding corrupt");
+        }
+        bo = bi * 0x1010101;
+        if (!w.equal(w.bitSlice([bo, bo, bo, bo], 0, bi * 8), w.bitSlice(output, output.length * 32 - bi * 8, output.length * 32))) {
+            throw new sjcl.exception.corrupt("pkcs#5 padding corrupt");
+        }
+        return w.bitSlice(output, 0, output.length * 32 - bi * 8);
+    }
+};
