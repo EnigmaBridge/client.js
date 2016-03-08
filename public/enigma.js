@@ -21,33 +21,37 @@ String.prototype.hexDecode = function(){
     return back;
 };
 
-function ebGenHexNonce(length){
-    return ebGenNonce(length, "0123456789abcdef");
-}
-
-function ebGenAlphaNonce(length){
-    return ebGenNonce(length, "0123456789abcdefghijklmnopqrstuvwxyz");
-}
-
-function ebGenNonce(length, alphabet){
-    var nonce = "";
-    var alphabetLen = alphabet.length;
-    var i = 0;
-
-    for(i = 0; i < length; i++){
-        nonce += alphabet.charAt(Math.floor(Math.random() * alphabetLen));
-    }
-
-    return nonce;
-}
-
-function xor(x,y) {
-    return [x[0]^y[0],x[1]^y[1],x[2]^y[2],x[3]^y[3]];
-}
-
 eb = {
     name: "EB"
 };
+
+eb.misc = {
+    name: "misc",
+    genNonce: function(length, alphabet){
+        var nonce = "";
+        var alphabetLen = alphabet.length;
+        var i = 0;
+
+        for(i = 0; i < length; i++){
+            nonce += alphabet.charAt(Math.floor(Math.random() * alphabetLen));
+        }
+
+        return nonce;
+    },
+    genHexNonce: function(length){
+        return this.genNonce(length, "0123456789abcdef");
+    },
+    genAlphaNonce: function (length){
+        return this.genNonce(length, "0123456789abcdefghijklmnopqrstuvwxyz");
+    },
+    xor: function(x,y){
+        return [x[0]^y[0],x[1]^y[1],x[2]^y[2],x[3]^y[3]];
+    }
+};
+
+function xor(x,y) {
+    return eb.misc.xor(x,y);
+}
 
 eb.padding = {
     name: "padding"

@@ -47,12 +47,14 @@
         var aesKey = "e134567890123456789012345678901234567890123456789012345678901234";
         var macKey = "e224262820223456789012345678901234567890123456789012345678901234";
         var keyId = 0x5544;
+        var plainData = "";
 
         //<userAPI>/<version>/ProcessData/<nonce>
         var apiKey = "API_TEST0000005544";
         var apiVersion = "1.0";
         var command = "ProcessData";
-        var nonce = ebGenHexNonce(16);
+        var nonce = eb.misc.genHexNonce(16);
+
         var userData = "Packet0_PLAINAES_00004bcd596b3afe9ab1ca440061edcb41729c5a700afdb611175f7543cafcc0e69ee2f07a1b8bf7a9e729523eb38af5f90a";
         console.log("Nonce: " + nonce);
 
@@ -67,6 +69,11 @@
         try {
             h = sjcl.codec.hex;
             ba = sjcl.bitArray;
+            pad = eb.padding.pkcs7;
+
+            // Plain data is empty for now.
+            var baPlain = h.toBits(plainData);
+            var plainDataLength = ba.bitLength(baPlain)/8;
 
             // Input data flag
             var baBuff = h.toBits("0x1f");
@@ -78,13 +85,17 @@
             baBuff = ba.concat(baBuff, h.toBits(data.hexEncode()));
             console.log("baBuff: " + h.fromBits(baBuff) + "; len: " + ba.bitLength(baBuff));
 
+            // Add padding.
+            baBuff = pad.pad(baBuff);
+            console.log("baBuff: " + h.fromBits(baBuff) + "; len: " + ba.bitLength(baBuff));
+
             var aesKeyBits = h.toBits(aesKey);
             var macKeyBits = h.toBits(macKey);
 
             aes = new sjcl.cipher.aes(aesKeyBits);
             hmac = new sjcl.misc.hmac(macKeyBits); //default is HMAC256. We use ALG_AES_MAC_128_NOPAD padding.
 
-            //the next to be replaced - entropy/IV to be received from the server
+            // IV is null, nonce in the first block is kind of IV.
             var IV = h.toBits("00000000000000000000000000000000");
             var encryptedData = sjcl.mode.cbc.encrypt(aes, baBuff, IV, []);
             console.log("encrypted: " + h.fromBits(encryptedData));
