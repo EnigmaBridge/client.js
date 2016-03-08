@@ -28,11 +28,15 @@
 <script>
     // When developing locally, you can use socat to bypass same origin policy:
     // socat TCP-LISTEN:11180,fork TCP:enigmabridge.com:11180
+    // Update: port is checked as well... Socat does not help.
+
+    // TODO: development node.js server. With CORS (cross domain resource sharing), adding
+    // TODO: an exception to the same origin policy settings. Do not use JSONP as it poses a security threat.
+    // TODO: in production, modify HTTP headers and set acceptable CORS domain (e.g., with PHP, header()), or configure
+    // TODO: a reverse proxy in the hosting HTTP server, so enigma/ goes to the remote endpoint.
 
     function display_message(msg)
     {
-        //alert(msg);
-        //document.getElementById("status").innerHTML = msg;
         $("#status")[0].innerHTML = msg;
     }
 
@@ -46,12 +50,12 @@
         var apiKey = "API_TEST0000005544";
         var apiVersion = "1.0";
         var command = "ProcessData";
-        var userObjectID = "0000005544";
         var nonce = ebGenNonce(16);
 //        var userData = data.hexEncode();
         var userData = "Packet0_PLAINAES_00004bcd596b3afe9ab1ca440061edcb41729c5a700afdb611175f7543cafcc0e69ee2f07a1b8bf7a9e729523eb38af5f90a";
 
-        var endpointUrl = sprintf("https://smarthsm.net:11180/%s/%s/%s/%s",
+        // dragonfly.smarthsm.net
+        var endpointUrl = sprintf("https://localhost:11180/%s/%s/%s/%s",
                 apiKey, apiVersion, command, nonce);
         console.log("URL: " + endpointUrl);
         console.log("UserData: " + userData);
@@ -67,6 +71,7 @@
             done: function (data, textStatus, jqXHR) {
                 console.log("Done: " + data);
                 display_message(data);
+                // var r = jQuery.parseJSON(response.responseText);
                 //jQuery("#usergrid").trigger("reloadGrid");
             },
             error: function (xhr, ajaxOptions, thrownError) {
