@@ -274,6 +274,11 @@ eb.comm.requestBuilder.prototype = {
      */
     reqType: "",
 
+    /**
+     * If set to true, request body building steps are logged.
+     */
+    debuggingLog: false,
+
     genNonce: function(){
         this.nonce = eb.misc.genHexNonce(16);
         return this.nonce;
@@ -321,7 +326,7 @@ eb.comm.requestBuilder.prototype = {
         baBuff = ba.concat(baBuff, requestData);
         // Add padding.
         baBuff = pad.pad(baBuff);
-        console.log("baBuff: " + h.fromBits(baBuff) + "; len: " + ba.bitLength(baBuff));
+        this._log("baBuff: " + h.fromBits(baBuff) + "; len: " + ba.bitLength(baBuff));
 
         var aesKeyBits = h.toBits(this.aesKey);
         var macKeyBits = h.toBits(this.macKey);
@@ -333,7 +338,7 @@ eb.comm.requestBuilder.prototype = {
         // IV is null, nonce in the first block is kind of IV.
         var IV = h.toBits('00'.repeat(16));
         var encryptedData = sjcl.mode.cbc.encrypt(aes, baBuff, IV, [], true);
-        console.log("encrypted: " + h.fromBits(encryptedData) + ", len=" + ba.bitLength(encryptedData));
+        this._log("encrypted: " + h.fromBits(encryptedData) + ", len=" + ba.bitLength(encryptedData));
 
         // include plain data in the MAC if non-empty.
         var toMac = encryptedData;
@@ -343,7 +348,7 @@ eb.comm.requestBuilder.prototype = {
         }
 
         var hmacData = hmac.mac(toMac);
-        console.log("hmacData: " + h.fromBits(hmacData));
+        this._log("hmacData: " + h.fromBits(hmacData));
 
         // Build the request block.
         var requestBase = sprintf("Packet0_%s_%04X%s%s%s",
@@ -354,8 +359,18 @@ eb.comm.requestBuilder.prototype = {
             h.fromBits(hmacData)
         );
 
-        console.log("request: " + requestBase);
+        this._log("request: " + requestBase);
         return requestBase;
+    },
+
+    _log:  function(x) {
+        if (!this.debuggingLog){
+            return;
+        }
+
+        if (console && console.log){
+            console.log(x);
+        }
     }
 };
 
