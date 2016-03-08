@@ -20,7 +20,7 @@
 
 <form name="dataPost">
     <label for="data">Data: </label>
-    <input type="text" id="data" name="data" size="80" title="Data"/>
+    <input type="text" id="data" name="data" size="80" title="Data" value="6bc1bee22e409f96e93d7e117393172a"/>
     <input type="submit" value="Submit"/>
 </form>
 <div id="status"></div>
@@ -46,99 +46,63 @@
         var aesAppKey = "11223344556677889900aabbccddeeff";
         var aesKey = "e134567890123456789012345678901234567890123456789012345678901234";
         var macKey = "e224262820223456789012345678901234567890123456789012345678901234";
-        var keyId = 0x5544;
+        var keyId = 0xee01;
         var plainData = sjcl.codec.utf8String.toBits("");
+        var requestData = sjcl.codec.hex.toBits(data);//sjcl.codec.utf8String.toBits(data);
 
         //<userAPI>/<version>/ProcessData/<nonce>
         var apiKey = "API_TEST0000005544";
         var apiVersion = "1.0";
         var command = "ProcessData";
-        var nonce = eb.misc.genHexNonce(16);
 
-        var requestBlock = "Packet0_PLAINAES_00004bcd596b3afe9ab1ca440061edcb41729c5a700afdb611175f7543cafcc0e69ee2f07a1b8bf7a9e729523eb38af5f90a";
+        // Build a new EB request.
+        var reqBuilder = new eb.comm.requestBuilder();
+        reqBuilder.aesKey = aesKey;
+        reqBuilder.macKey = macKey;
+        reqBuilder.userObjectId = keyId;
+        reqBuilder.reqType = "PLAINAES";
+        reqBuilder.genNonce();
+
+        var requestBlock = reqBuilder.build(plainData, requestData);
+        var nonce = reqBuilder.nonce;
+
         console.log("Nonce: " + nonce);
+        console.log("request block: " + requestBlock);
 
-        // Data format before encryption:
-        // buff = 0x1f | <UOID-4B> | userdata
-        //
-        // Encryption
-        // AES-256/CBC/PKCS7, IV = 0x00000000000000000000000000000000
-        //
-        // MAC
-        // AES-256-CBC-MAC.
-        //
-        // encBlock = enc(buff)
-        // result = encBlock || mac(plaindata || encBlock)
-        //
-        // output = Packet0| _PLAINAES_ | <plain-data-length-4B> | <plaindata> | hexcode(result)
-        try {
-            h = sjcl.codec.hex;
-            ba = sjcl.bitArray;
-            pad = eb.padding.pkcs7;
+        // AJAX call
+        var method = "GET";
+        var endpointUrl;
+        var endpointRequestData;
+        if (method == "POST"){
+            endpointUrl = sprintf("https://dragonfly.smarthsm.net/%s/%s/%s/%s",
+                    apiKey, apiVersion, command, nonce);
+            endpointRequestData = {data: requestBlock};
 
-            // Plain data is empty for now.
-            var baPlain = plainData;
-            var plainDataLength = ba.bitLength(baPlain)/8;
+        } else if (method == "GET"){
+            endpointUrl = sprintf("https://dragonfly.smarthsm.net/%s/%s/%s/%s/%s",
+                    apiKey, apiVersion, command, nonce, requestBlock);
+            endpointRequestData = {};
 
-            // Input data flag
-            var baBuff = h.toBits("0x1f");
-            // User Object ID
-            baBuff = ba.concat(baBuff, h.toBits(sprintf("%04x", keyId)));
-            // Freshness nonce
-            baBuff = ba.concat(baBuff, h.toBits(nonce));
-            // User data
-            baBuff = ba.concat(baBuff, sjcl.codec.utf8String.toBits(data));
-            // Add padding.
-            baBuff = pad.pad(baBuff);
-            console.log("baBuff: " + h.fromBits(baBuff) + "; len: " + ba.bitLength(baBuff));
-
-            var aesKeyBits = h.toBits(aesKey);
-            var macKeyBits = h.toBits(macKey);
-
-            aes = new sjcl.cipher.aes(aesKeyBits);
-            aesMac = new sjcl.cipher.aes(macKeyBits);
-            hmac = new sjcl.misc.hmac_cbc(aesMac);
-
-            // IV is null, nonce in the first block is kind of IV.
-            var IV = h.toBits("00000000000000000000000000000000");
-            var encryptedData = sjcl.mode.cbc.encrypt(aes, baBuff, IV, []);
-            console.log("encrypted: " + h.fromBits(encryptedData));
-
-            // include plain data in the MAC if non-empty.
-            var toMac = encryptedData;
-            if (plainDataLength > 0){
-                toMac = ba.concat(baPlain, encryptedData);
-                toMac = pad.pad(toMac);
-            }
-
-            var hmacData = hmac.mac(toMac);
-            console.log("hmacData: " + h.fromBits(hmacData));
-
-            // Build the request block.
-            var requestBase = sprintf("Packet0_PLAINAES_%04X%s%s%s",
-                    plainDataLength,
-                    h.fromBits(plainData),
-                    h.fromBits(encryptedData),
-                    h.fromBits(hmacData)
-            );
-            console.log("request: " + requestBase);
-        }
-        catch (err) {
-            console.log("Error: " + err);
         }
 
-        var endpointUrl = sprintf("https://dragonfly.smarthsm.net/%s/%s/%s/%s",
-                apiKey, apiVersion, command, nonce);
+        console.log("URL: " + endpointUrl + ", method: " + method);
+        console.log("UserData: " + JSON.stringify(endpointRequestData));
 
-        console.log("URL: " + endpointUrl);
-        console.log("UserData: " + requestBlock);
+        // Build JSON request for pure socket query
+        socketReq = {
+            objectid:apiKey,
+            data:requestBlock,
+            function:command,
+            nonce:nonce,
+            version:apiVersion};
+        console.log("SocketReq: " + JSON.stringify(socketReq));
 
         // Do the remote call
         $.ajax({
             url: endpointUrl,
-            type: 'POST',
+            type: method,
             dataType: 'json',
-            data: {data: requestBlock},
+            data: endpointRequestData,
             timeout: 7000,
 
             done: function (data, textStatus, jqXHR) {

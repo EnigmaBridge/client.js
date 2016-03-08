@@ -21,10 +21,18 @@ String.prototype.hexDecode = function(){
     return back;
 };
 
+/**
+ * Base EB package.
+ * @type {{name: string}}
+ */
 eb = {
     name: "EB"
 };
 
+/**
+ * EB misc wrapper.
+ * @type {{name: string, genNonce: eb.misc.genNonce, genHexNonce: eb.misc.genHexNonce, genAlphaNonce: eb.misc.genAlphaNonce, xor: eb.misc.xor}}
+ */
 eb.misc = {
     name: "misc",
     genNonce: function(length, alphabet){
@@ -49,6 +57,10 @@ eb.misc = {
     }
 };
 
+/**
+ * EB padding schemes wrapper.
+ * @type {{name: string}}
+ */
 eb.padding = {
     name: "padding"
 };
@@ -198,3 +210,109 @@ sjcl.mode.cbc = {
         return w.bitSlice(output, 0, (output.length << 5) - (bi << 3));
     }
 };
+
+/**
+ * Request builder.
+ * @type {{}}
+ */
+eb.comm = {
+    name: "comm",
+    buildRequest : function(userObjectId, nonce, aesKey, macKey, plainData, requestData){
+
+    }
+};
+
+eb.comm.requestBuilder = function(nonce, aesKey, macKey, userObjectId, reqType){
+    this.userObjectId = userObjectId || -1;
+    this.nonce = nonce || "";
+    this.aesKey = aesKey || "";
+    this.macKey = macKey || "";
+    this.reqType = reqType || "PLAINAES";
+};
+
+eb.comm.requestBuilder.prototype = {
+    userObjectId : -1,
+    aesKey: "",
+    macKey: "",
+    nonce: "",
+    reqType: "",
+
+    genNonce: function(){
+        this.nonce = eb.misc.genHexNonce(16);
+        return this.nonce;
+    },
+
+    build: function(plainData, requestData){
+        this.nonce = this.nonce || eb.misc.genHexNonce(16);
+
+        // Data format before encryption:
+        // buff = 0x1f | <UOID-4B> | userdata
+        //
+        // Encryption
+        // AES-256/CBC/PKCS7, IV = 0x00000000000000000000000000000000
+        //
+        // MAC
+        // AES-256-CBC-MAC.
+        //
+        // encBlock = enc(buff)
+        // result = encBlock || mac(plaindata || encBlock)
+        //
+        // output = Packet0| _PLAINAES_ | <plain-data-length-4B> | <plaindata> | hexcode(result)
+
+        h = sjcl.codec.hex;
+        ba = sjcl.bitArray;
+        pad = eb.padding.pkcs7;
+
+        // Plain data is empty for now.
+        var baPlain = plainData;
+        var plainDataLength = ba.bitLength(baPlain)/8;
+
+        // Input data flag
+        var baBuff = h.toBits("0x1f");
+        // User Object ID
+        baBuff = ba.concat(baBuff, h.toBits(sprintf("%04x", this.userObjectId)));
+        // Freshness nonce
+        baBuff = ba.concat(baBuff, h.toBits(this.nonce));
+        // User data
+        baBuff = ba.concat(baBuff, requestData);
+        // Add padding.
+        baBuff = pad.pad(baBuff);
+        console.log("baBuff: " + h.fromBits(baBuff) + "; len: " + ba.bitLength(baBuff));
+
+        var aesKeyBits = h.toBits(this.aesKey);
+        var macKeyBits = h.toBits(this.macKey);
+
+        aes = new sjcl.cipher.aes(aesKeyBits);
+        aesMac = new sjcl.cipher.aes(macKeyBits);
+        hmac = new sjcl.misc.hmac_cbc(aesMac);
+
+        // IV is null, nonce in the first block is kind of IV.
+        var IV = h.toBits('00'.repeat(16));
+        var encryptedData = sjcl.mode.cbc.encrypt(aes, baBuff, IV, []);
+        console.log("encrypted: " + h.fromBits(encryptedData));
+
+        // include plain data in the MAC if non-empty.
+        var toMac = encryptedData;
+        if (plainDataLength > 0){
+            toMac = ba.concat(baPlain, encryptedData);
+            toMac = pad.pad(toMac);
+        }
+
+        var hmacData = hmac.mac(toMac);
+        console.log("hmacData: " + h.fromBits(hmacData));
+
+        // Build the request block.
+        var requestBase = sprintf("Packet0_%s_%04X%s%s%s",
+            this.reqType,
+            plainDataLength,
+            h.fromBits(plainData),
+            h.fromBits(encryptedData),
+            h.fromBits(hmacData)
+        );
+
+        console.log("request: " + requestBase);
+        return requestBase;
+    }
+};
+
+
