@@ -163,7 +163,7 @@
         }).fail(function(jqXHR, textStatus, errorThrown) {
             var msg = sprintf("Error: status=%d, responseText: %s, error: %s, status: %s",
                     jqXHR.status, jqXHR.responseText, errorThrown, textStatus);
-            
+
             log("Error: " + msg);
 
         }).always(function(data, textStatus, jqXHR) {
