@@ -74,12 +74,12 @@
         var endpointUrl;
         var endpointRequestData;
         if (method == "POST"){
-            endpointUrl = sprintf("https://dragonfly.smarthsm.net/%s/%s/%s/%s",
+            endpointUrl = sprintf("https://dragonfly.smarthsm.net:11180/%s/%s/%s/%s",
                     apiKey, apiVersion, command, nonce);
             endpointRequestData = {data: requestBlock};
 
         } else if (method == "GET"){
-            endpointUrl = sprintf("https://dragonfly.smarthsm.net/%s/%s/%s/%s/%s",
+            endpointUrl = sprintf("https://dragonfly.smarthsm.net:11180/%s/%s/%s/%s/%s",
                     apiKey, apiVersion, command, nonce, requestBlock);
             endpointRequestData = {};
 
