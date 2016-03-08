@@ -288,7 +288,7 @@ eb.comm.requestBuilder.prototype = {
         // Input data flag
         var baBuff = h.toBits("0x1f");
         // User Object ID
-        baBuff = ba.concat(baBuff, h.toBits(sprintf("%04x", this.userObjectId)));
+        baBuff = ba.concat(baBuff, h.toBits(sprintf("%08x", this.userObjectId)));
         // Freshness nonce
         baBuff = ba.concat(baBuff, h.toBits(this.nonce));
         // User data
