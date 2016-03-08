@@ -134,6 +134,24 @@ eb.padding.pkcs7 = {
 };
 
 /**
+ * Extracts 32bit number from the bitArray.
+ * Original extract does not work with blength = 32 as 1<<32 == 1, it returns 0 always.
+ *
+ * @param a
+ * @param bstart
+ * @returns {*}
+ */
+sjcl.bitArray.extract32 = function(a, bstart){
+    var x, sh = Math.floor((-bstart-32) & 31);
+    if ((bstart + 32 - 1 ^ bstart) & -32) {
+        x = (a[bstart/32|0] << (32 - sh)) ^ (a[bstart/32+1|0] >>> sh);
+    } else {
+        x = a[bstart/32|0] >>> sh;
+    }
+    return x;
+};
+
+/**
  * CBC-MAC with given cipher & padding.
  * @param Cipher
  * @param bs
@@ -205,7 +223,7 @@ sjcl.mode.cbc = {
         if ((sjcl.bitArray.bitLength(b) & 127) || !b.length) {
             throw new sjcl.exception.corrupt("cbc ciphertext must be a positive multiple of the block size");
         }
-        var i, w = sjcl.bitArray, bi, bo, output = [];
+        var i, w = sjcl.bitArray, bi, bo, output = [], xor = eb.misc.xor;
         d = d || [];
         for (i = 0; i < b.length; i += 4) {
             bi = b.slice(i, i + 4);
@@ -216,11 +234,11 @@ sjcl.mode.cbc = {
         if (!noPad) {
             bi = output[i - 1] & 255;
             if (bi == 0 || bi > 16) {
-                throw new sjcl.exception.corrupt("pkcs#5 padding corrupt");
+                throw new sjcl.exception.corrupt("pkcs#5 padding corrupt"); //TODO: padding oracle?
             }
             bo = bi * 0x1010101;
             if (!w.equal(w.bitSlice([bo, bo, bo, bo], 0, bi << 3), w.bitSlice(output, (output.length << 5) - (bi << 3), output.length << 5))) {
-                throw new sjcl.exception.corrupt("pkcs#5 padding corrupt");
+                throw new sjcl.exception.corrupt("pkcs#5 padding corrupt"); //TODO: padding oracle?
             }
             return w.bitSlice(output, 0, (output.length << 5) - (bi << 3));
         } else {
@@ -235,11 +253,39 @@ sjcl.mode.cbc = {
  */
 eb.comm = {
     name: "comm",
-    buildRequest : function(userObjectId, nonce, aesKey, macKey, plainData, requestData){
+    demangleNonce: function(nonce){
+        ba = sjcl.bitArray;
+        var bl = ba.bitLength(nonce);
+        if ((bl&7) != 0){
+            throw new sjcl.exception.invalid("nonce has to be aligned to bytes");
+        }
 
+        var i, w = sjcl.bitArray, bp = 0, output = [], c;
+        for (i = 0; bp + 32 <= bl; i += 1, bp += 32) {
+            c = nonce.slice(i, i + 1)[0] - 0x01010101;
+            output.splice(i, 0, c);
+        }
+
+        if (bp+32 == bl){
+            return output;
+        }
+
+        var rbl = bl - (bp-32);
+        var sub = 0x01010101 & (((1<<rbl)-1)<<(32-rbl));
+        c = (nonce.slice(i, i + 1)[0] - sub) >>> rbl;
+        output.splice(i, 0, c);
+        return sjcl.bitArray.clamp(output, bl);
     }
 };
 
+/**
+ * EB request builder.
+ * @param nonce
+ * @param aesKey
+ * @param macKey
+ * @param userObjectId
+ * @param reqType
+ */
 eb.comm.requestBuilder = function(nonce, aesKey, macKey, userObjectId, reqType){
     this.userObjectId = userObjectId || -1;
     this.nonce = nonce || "";
@@ -374,4 +420,170 @@ eb.comm.requestBuilder.prototype = {
     }
 };
 
+/**
+ * Response parser.
+ * @param aesKey
+ * @param macKey
+ */
+eb.comm.responseParser = function(aesKey, macKey){
+    this.aesKey = aesKey || "";
+    this.macKey = macKey || "";
+};
+
+eb.comm.responseParser.prototype = {
+    /**
+     * Parsed user object ID, integer type.
+     */
+    userObjectId : -1,
+
+    /**
+     * INPUT: AES communication encryption key, hexcoded string.
+     */
+    aesKey: "",
+
+    /**
+     * INPUT: AES MAC communication key, hexcoded string.
+     */
+    macKey: "",
+
+    /**
+     * Parsed freshness nonce / IV, hexcoded string.
+     */
+    nonce: "",
+
+    /**
+     * Parsed function
+     */
+    function: "",
+
+    /**
+     * Parsed status code. 0x9000 = OK.
+     */
+    statusCode: 0,
+
+    /**
+     * Parsed status detail.
+     */
+    statusDetail: "",
+
+    /**
+     * If set to true, response body parsing steps are logged to the console.
+     */
+    debuggingLog: false,
+
+    /**
+     * Returns true if after parsing, code is OK.
+     * @returns {boolean}
+     */
+    success: function(){
+        return this.statusCode == 0x9000;
+    },
+
+    /**
+     * Parse EB response
+     *
+     * @param data - json response
+     * @returns request unwrapped response.
+     */
+    parse: function(data){
+        if (!data || !data.status || !data.function){
+            throw new sjcl.exception.invalid("response data invalid");
+        }
+
+        this.statusCode = parseInt(data.status, 16);
+        this.statusDetail = data.statusdetail | "";
+        this.function = data.function;
+        if (!this.success()){
+            this._log("Error in processing, status: " + data.status + ", message: " + this.statusDetail);
+            return;
+        }
+
+        var resultBuffer = data.result;
+        var baResult = h.toBits(resultBuffer.substring(0, resultBuffer.indexOf("_")));
+        var plainLen = ba.extract(baResult, 0, 2*8);
+        var plainBits = ba.bitSlice(baResult, 2*8, 2*8+plainLen*8);
+        var protectedBits = ba.bitSlice(baResult, 2*8+plainLen*8);
+        var protectedBitsBl = ba.bitLength(protectedBits);
+
+        // Decrypt and verify
+        h = sjcl.codec.hex;
+        ba = sjcl.bitArray;
+        pad = eb.padding.pkcs7;
+
+        var aesKeyBits = h.toBits(this.aesKey);
+        var macKeyBits = h.toBits(this.macKey);
+        aes = new sjcl.cipher.aes(aesKeyBits);
+        aesMac = new sjcl.cipher.aes(macKeyBits);
+        hmac = new sjcl.misc.hmac_cbc(aesMac, 16, eb.padding.empty);
+
+        // Verify MAC.
+        var macTagOffset = protectedBitsBl - 16*8;
+        var dataToMac = ba.bitSlice(protectedBits, 0, macTagOffset);
+        if ((ba.bitLength(dataToMac) & 127) != 0){
+            throw new sjcl.exception.corrupt("Padding size invalid");
+        }
+
+        if (plainLen > 0){
+            dataToMac = ba.concat(plainBits, dataToMac);
+            dataToMac = pad.pad(dataToMac);
+        }
+
+        var returnedMac = ba.bitSlice(protectedBits, macTagOffset);
+        if (ba.bitLength(returnedMac) != 16*8){
+            throw new sjcl.exception.corrupt("MAC corrupted");
+        }
+
+        var computedMac = hmac.mac(dataToMac);
+        this._log("DataToMac: " + h.fromBits(dataToMac));
+        this._log("returnedMac: " + h.fromBits(returnedMac));
+        this._log("computedMac: " + h.fromBits(computedMac));
+        if (!returnedMac || !ba.equal(returnedMac, computedMac)){
+            throw new sjcl.exception.corrupt("Padding is not valid"); //TODO: padding oracle?
+        }
+
+        // Decrypt.
+        var dataToDecrypt = ba.bitSlice(protectedBits, 0, macTagOffset);
+        this._log("dataToDecrypt: " + h.fromBits(dataToDecrypt) + ", len=" + ba.bitLength(dataToDecrypt));
+        if ((ba.bitLength(dataToDecrypt) & 127) != 0){
+            throw new sjcl.exception.corrupt("Ciphertext block invalid");
+        }
+
+        // IV is null, nonce in the first block is kind of IV.
+        var IV = h.toBits('00'.repeat(16));
+        var decryptedData = sjcl.mode.cbc.decrypt(aes, dataToDecrypt, IV, [], false);
+        this._log("decryptedData: " + h.fromBits(decryptedData) + ", len=" + ba.bitLength(decryptedData));
+
+        // Check the flag.
+        var responseFlag = ba.extract(decryptedData, 0, 8);
+        if (responseFlag != 0xf1){
+            throw new sjcl.exception.corrupt("Given data packet is not a response (flag mismatch)");
+        }
+
+        // Get user object.
+        self.userObjectId = ba.extract32(decryptedData, 8);
+        this._log("returnedUserObject: " + sprintf("%08x", self.userObjectId));
+
+        // Get nonce, mangled.
+        var returnedMangledNonce = ba.bitSlice(decryptedData, 5*8, 5*8+8*8);
+        this.nonce = eb.comm.demangleNonce(returnedMangledNonce);
+        this._log("returnedNonce: " + h.fromBits(this.nonce));
+
+        // Response = plainData + decryptedData.
+        var responseUnprotected = ba.bitSlice(decryptedData, 5*8+8*8);
+        var responseData = ba.concat(plainBits, responseUnprotected);
+        this._log("responseData: " + h.fromBits(responseUnprotected));
+
+        return responseData;
+    },
+
+    _log:  function(x) {
+        if (!this.debuggingLog){
+            return;
+        }
+
+        if (console && console.log){
+            console.log(x);
+        }
+    }
+};
 

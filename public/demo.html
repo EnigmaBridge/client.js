@@ -62,6 +62,7 @@
         reqBuilder.userObjectId = keyId;
         reqBuilder.reqType = "PLAINAES";
         reqBuilder.debuggingLog = true;
+        reqBuilder.nonce = "0000000000000000"; // for testing only.
         reqBuilder.genNonce();
 
         var requestBlock = reqBuilder.build(plainData, requestData);
@@ -101,7 +102,19 @@
         // Testvector:   {"objectid":"API_TEST0000005544","data":"Packet0_PLAINAES_00004bcd596b3afe9ab1ca440061edcb41729c5a700afdb611175f7543cafcc0e69ee2f07a1b8bf7a9e729523eb38af5f90a","function":"ProcessData","nonce":"334613358783577","version":"1.0"}
         // Testresponse: {"function":"ProcessData","result":"0000d2953f6701ec054e95a0ea6b3760c9598b0e69177cae18d13b9004574ae7d6a746ae82c876167f6c9bf74a1fd162d779_Packet0_PLAINAES_","status":"9000","statusdetail":"(OK)SW_STAT_OK","version":"1.0"}
         processAnswer = function(data){
-            console.log("Answer: " + data + ", json="+JSON.stringify(data));
+            h = sjcl.codec.hex;
+
+            // Build a new EB request.
+            var parser = new eb.comm.responseParser();
+            parser.aesKey = aesKey;
+            parser.macKey = macKey;
+            parser.debuggingLog = true;
+            var responseBody = parser.parse(data);
+            if (parser.success()){
+                console.log("Processing complete, response: " + h.fromBits(responseBody));
+            } else {
+                console.log("Failure, status: " + parser.statusCode);
+            }
         };
 
         // Do the remote call
@@ -110,7 +123,7 @@
             type: method,
             dataType: 'json',
             data: endpointRequestData,
-            timeout: 3000
+            timeout: 7000
         }).done(function(data, textStatus, jqXHR){
             console.log("Done: " + textStatus);
             display_message(JSON.stringify(data));
