@@ -49,27 +49,53 @@ eb.misc = {
     }
 };
 
-function xor(x,y) {
-    return eb.misc.xor(x,y);
-}
-
 eb.padding = {
     name: "padding"
 };
 
+/**
+ * Padding - identity function.
+ * @type {{name: string, pad: eb.padding.empty.pad, unpad: eb.padding.empty.unpad}}
+ */
+eb.padding.empty = {
+    name: "empty",
+    pad: function(a, blocklen){
+        return a;
+    },
+    unpad: function(a, blocklen){
+        return a;
+    }
+};
+
+/**
+ * PKCS7 padding.
+ * @type {{name: string, pad: eb.padding.pkcs7.pad, unpad: eb.padding.pkcs7.unpad}}
+ */
 eb.padding.pkcs7 = {
     name: "pkcs7",
-    pad: function(a){
-        var bl = sjcl.bitArray.bitLength(a);
-        var padLen = (16 - ((bl >> 3) & 15));
-        if (padLen == 16){
-            return a;
+    pad: function(a, blocklen){
+        blocklen = blocklen || 16;
+        if (!blocklen || (blocklen & (blocklen - 1))){
+            throw new sjcl.exception.corrupt("blocklength has to be power of 2");
+        }
+        if (blocklen != 16){
+            throw new sjcl.exception.corrupt("blocklength different than 16 is not implemented yet");
         }
 
+        var bl = sjcl.bitArray.bitLength(a);
+        var padLen = (16 - ((bl >> 3) & 15));
         var padFill = padLen * 0x1010101;
         return sjcl.bitArray.concat(a, [padFill, padFill, padFill, padFill]).slice(0, ((bl >> 3) + padLen) >> 2);
     },
-    unpad: function(a){
+    unpad: function(a, blocklen){
+        blocklen = blocklen || 16;
+        if (!blocklen || (blocklen & (blocklen - 1))){
+            throw new sjcl.exception.corrupt("blocklength has to be power of 2");
+        }
+        if (blocklen != 16){
+            throw new sjcl.exception.corrupt("blocklength different than 16 is not implemented yet");
+        }
+
         w = sjcl.bitArray;
         var bl = w.bitLength(a);
         if (bl & 127 || !a.length) {
@@ -90,6 +116,37 @@ eb.padding.pkcs7 = {
     }
 };
 
+/**
+ * CBC-MAC with given cipher & padding.
+ * @param Cipher
+ * @param bs
+ * @param padding
+ */
+sjcl.misc.hmac_cbc = function (Cipher, bs, padding) {
+    this._cipher = Cipher;
+    this._bs = bs = bs || 16;
+    this._padding = padding = padding || eb.padding.empty;
+};
+
+/** HMAC with the specified hash function.  Also called encrypt since it's a prf.
+ * @param {bitArray|String} data The data to mac.
+ */
+sjcl.misc.hmac_cbc.prototype.encrypt = sjcl.misc.hmac_cbc.prototype.mac = function (data) {
+    var i, w = sjcl.bitArray, bl = w.bitLength(data), bp = 0, output = [], xor = eb.misc.xor;
+    var bsb = this._bs << 3;
+
+    data = this._padding.pad(data, this._bs);
+    c = sjcl.codec.hex.toBits('00'.repeat(this._bs));
+    for (i = 0; bp + bsb <= bl; i += 4, bp += bsb) {
+        c = this._cipher.encrypt(xor(c, data.slice(i, i + 4)));
+    }
+    return c;
+};
+
+/**
+ * CBC encryption mode.
+ * @type {{name: string, encrypt: sjcl.mode.cbc.encrypt, decrypt: sjcl.mode.cbc.decrypt}}
+ */
 sjcl.mode.cbc = {
     name: "cbc",
     encrypt: function (a, b, c, d) {
@@ -99,7 +156,7 @@ sjcl.mode.cbc = {
         if (sjcl.bitArray.bitLength(c) !== 128) {
             throw new sjcl.exception.invalid("cbc iv must be 128 bits");
         }
-        var i, w = sjcl.bitArray, bl = w.bitLength(b), bp = 0, output = [];
+        var i, w = sjcl.bitArray, bl = w.bitLength(b), bp = 0, output = [], xor = eb.misc.xor;
         if ((bl & 7) != 0) {
             throw new sjcl.exception.invalid("pkcs#5 padding only works for multiples of a byte");
         }
