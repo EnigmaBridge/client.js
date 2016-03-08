@@ -325,6 +325,11 @@ eb.comm.requestBuilder.prototype = {
      */
     debuggingLog: false,
 
+    /**
+     * Aux logging function
+     */
+    logger: null,
+
     genNonce: function(){
         this.nonce = eb.misc.genHexNonce(16);
         return this.nonce;
@@ -417,6 +422,10 @@ eb.comm.requestBuilder.prototype = {
         if (console && console.log){
             console.log(x);
         }
+
+        if (this.logger){
+            this.logger(x);
+        }
     }
 };
 
@@ -470,6 +479,11 @@ eb.comm.responseParser.prototype = {
      * If set to true, response body parsing steps are logged to the console.
      */
     debuggingLog: false,
+
+    /**
+     * Aux logging function
+     */
+    logger: null,
 
     /**
      * Returns true if after parsing, code is OK.
@@ -534,7 +548,6 @@ eb.comm.responseParser.prototype = {
         }
 
         var computedMac = hmac.mac(dataToMac);
-        this._log("DataToMac: " + h.fromBits(dataToMac));
         this._log("returnedMac: " + h.fromBits(returnedMac));
         this._log("computedMac: " + h.fromBits(computedMac));
         if (!returnedMac || !ba.equal(returnedMac, computedMac)){
@@ -543,7 +556,6 @@ eb.comm.responseParser.prototype = {
 
         // Decrypt.
         var dataToDecrypt = ba.bitSlice(protectedBits, 0, macTagOffset);
-        this._log("dataToDecrypt: " + h.fromBits(dataToDecrypt) + ", len=" + ba.bitLength(dataToDecrypt));
         if ((ba.bitLength(dataToDecrypt) & 127) != 0){
             throw new sjcl.exception.corrupt("Ciphertext block invalid");
         }
@@ -583,6 +595,10 @@ eb.comm.responseParser.prototype = {
 
         if (console && console.log){
             console.log(x);
+        }
+
+        if (this.logger){
+            this.logger(x);
         }
     }
 };

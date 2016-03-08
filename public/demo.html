@@ -36,11 +36,34 @@
         $("#status")[0].innerHTML = msg;
     }
 
+    function formatDate(date) {
+        var hours = date.getHours();
+        var minutes = date.getMinutes();
+        var ampm = hours >= 12 ? 'pm' : 'am';
+        hours = hours % 12;
+        hours = hours ? hours : 12; // the hour '0' should be '12'
+        minutes = minutes < 10 ? '0'+minutes : minutes;
+        var strTime = hours + ':' + minutes + ' ' + ampm;
+        return date.getMonth()+1 + "/" + date.getDate() + "/" + date.getFullYear() + "  " + strTime;
+    }
+
+    function append_message(msg)
+    {
+        var status = $("#status");
+        var newMsg = formatDate(new Date()) + " " + msg;
+        status.html(status.html() + "<br/>\n" + newMsg);
+    }
+
+    function log(msg){
+        console.log(msg);
+        append_message(msg);
+    }
+
     function doRequest(data)
     {
         // Sanity checks
         if (!data)
-            return display_message("Data is empty");
+            return append_message("Data is empty");
 
         // Keys
         var aesAppKey = "11223344556677889900aabbccddeeff";
@@ -49,6 +72,9 @@
         var keyId = 0xee01;
         var plainData = sjcl.codec.utf8String.toBits("");
         var requestData = sjcl.codec.hex.toBits(data); //sjcl.codec.utf8String.toBits(data);
+        var logger = function(msg) {
+            append_message(msg);
+        };
 
         //<userAPI>/<version>/ProcessData/<nonce>
         var apiKey = sprintf("%s%010x", "API_TEST", keyId);
@@ -62,14 +88,15 @@
         reqBuilder.userObjectId = keyId;
         reqBuilder.reqType = "PLAINAES";
         reqBuilder.debuggingLog = true;
+        reqBuilder.logger = logger;
         reqBuilder.nonce = "0000000000000000"; // for testing only.
         reqBuilder.genNonce();
 
         var requestBlock = reqBuilder.build(plainData, requestData);
         var nonce = reqBuilder.nonce;
 
-        console.log("Nonce: " + nonce);
-        console.log("request block: " + requestBlock);
+        log("Nonce: " + nonce);
+        log("request block: " + requestBlock);
 
         // AJAX call
         var method = "GET";
@@ -87,8 +114,8 @@
 
         }
 
-        console.log("URL: " + endpointUrl + ", method: " + method);
-        console.log("UserData: " + JSON.stringify(endpointRequestData));
+        log("URL: " + endpointUrl + ", method: " + method);
+        log("UserData: " + JSON.stringify(endpointRequestData));
 
         // Build JSON request for pure socket query
         socketReq = {
@@ -97,7 +124,7 @@
             function:command,
             nonce:nonce,
             version:apiVersion};
-        console.log("SocketReq: " + JSON.stringify(socketReq));
+        log("SocketReq: " + JSON.stringify(socketReq));
 
         // Testvector:   {"objectid":"API_TEST0000005544","data":"Packet0_PLAINAES_00004bcd596b3afe9ab1ca440061edcb41729c5a700afdb611175f7543cafcc0e69ee2f07a1b8bf7a9e729523eb38af5f90a","function":"ProcessData","nonce":"334613358783577","version":"1.0"}
         // Testresponse: {"function":"ProcessData","result":"0000d2953f6701ec054e95a0ea6b3760c9598b0e69177cae18d13b9004574ae7d6a746ae82c876167f6c9bf74a1fd162d779_Packet0_PLAINAES_","status":"9000","statusdetail":"(OK)SW_STAT_OK","version":"1.0"}
@@ -109,11 +136,15 @@
             parser.aesKey = aesKey;
             parser.macKey = macKey;
             parser.debuggingLog = true;
+            parser.logger = logger;
+
             var responseBody = parser.parse(data);
             if (parser.success()){
-                console.log("Processing complete, response: " + h.fromBits(responseBody));
+                log("Processing complete, response: " + h.fromBits(responseBody));
+
             } else {
-                console.log("Failure, status: " + parser.statusCode);
+                log("Failure, status: " + parser.statusCode);
+
             }
         };
 
@@ -125,17 +156,18 @@
             data: endpointRequestData,
             timeout: 7000
         }).done(function(data, textStatus, jqXHR){
-            console.log("Done: " + textStatus);
-            display_message(JSON.stringify(data));
+            log("Done: " + textStatus);
+            append_message("Raw response: " + JSON.stringify(data));
             processAnswer(data);
 
         }).fail(function(jqXHR, textStatus, errorThrown) {
-            var msg = sprintf("Error: status=%d, responseText: %s, error: %s", xhr.status, xhr.responseText, thrownError);
-            console.log("Error: " + msg);
-            display_message(msg);
+            var msg = sprintf("Error: status=%d, responseText: %s, error: %s, status: %s",
+                    jqXHR.status, jqXHR.responseText, errorThrown, textStatus);
+            
+            log("Error: " + msg);
 
         }).always(function(data, textStatus, jqXHR) {
-            console.log("Complete");
+            log("Complete");
         });
     }
 
