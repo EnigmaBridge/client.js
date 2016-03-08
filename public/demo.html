@@ -99,7 +99,7 @@
         log("request block: " + requestBlock);
 
         // AJAX call
-        var method = "GET";
+        var method = "POST";
         var endpointUrl;
         var endpointRequestData;
         if (method == "POST"){
@@ -153,7 +153,7 @@
             url: endpointUrl,
             type: method,
             dataType: 'json',
-            data: endpointRequestData,
+            data: method == "POST" ? JSON.stringify(endpointRequestData) : null,
             timeout: 7000
         }).done(function(data, textStatus, jqXHR){
             log("Done: " + textStatus);
