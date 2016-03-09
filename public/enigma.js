@@ -394,13 +394,7 @@ eb.comm.requestBuilder.prototype = {
         this._log("encrypted: " + h.fromBits(encryptedData) + ", len=" + ba.bitLength(encryptedData));
 
         // include plain data in the MAC if non-empty.
-        var toMac = encryptedData;
-        if (plainDataLength > 0){
-            toMac = ba.concat(baPlain, encryptedData);
-            toMac = pad.pad(toMac);
-        }
-
-        var hmacData = hmac.mac(toMac);
+        var hmacData = hmac.mac(encryptedData);
         this._log("hmacData: " + h.fromBits(hmacData));
 
         // Build the request block.
@@ -453,7 +447,7 @@ eb.comm.response.prototype = {
 
     /**
      * Plain data parsed from the response.
-     * Protected by MAC, not encrypted.
+     * Nor MACed neither encrypted.
      * @output
      */
     plainData: "",
@@ -611,11 +605,6 @@ eb.comm.responseParser.prototype = {
         var dataToMac = ba.bitSlice(protectedBits, 0, macTagOffset);
         if ((ba.bitLength(dataToMac) & 127) != 0){
             throw new sjcl.exception.corrupt("Padding size invalid");
-        }
-
-        if (plainLen > 0){
-            dataToMac = ba.concat(plainBits, dataToMac);
-            dataToMac = pad.pad(dataToMac);
         }
 
         resp.mac = ba.bitSlice(protectedBits, macTagOffset);
