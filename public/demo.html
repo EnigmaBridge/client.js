@@ -120,8 +120,7 @@
         var minutes = date.getMinutes();
         var sec = date.getSeconds();
         var milli = date.getMilliseconds();
-        minutes = minutes < 10 ? '0'+minutes : minutes;
-        var strTime = sprintf("%s:%s:%s.%s", hours, minutes, sec, milli);
+        var strTime = sprintf("%02d:%02d:%02d.%03d", hours, minutes, sec, milli);
         return date.getMonth()+1 + "/" + date.getDate() + "/" + date.getFullYear() + " " + strTime;
     }
 
