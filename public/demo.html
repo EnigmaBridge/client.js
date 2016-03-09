@@ -8,9 +8,11 @@
         h1 {font-size: 14pt; }
         h2 {font-size: 12pt; }
         #footer {font-size: 8pt; text-align: center; padding: 0 10px 10px 10px}
-        #status {background-color: #C1C1FF; padding: 10px 10px 10px 10px; font-family: monospace; margin-top: 10px;}
+        .logbox { background-color: #2A88AD; padding: 10px 10px 10px 10px; font-family: monospace; margin-top: 10px; color: #f9f9f9;}
         .preformatted { font-family: monospace;  white-space: pre;}
     </style>
+    <link href='http://fonts.googleapis.com/css?family=Bitter' rel='stylesheet' type='text/css'/>
+    <link rel="stylesheet" type="text/css" href="forms.css"/>
     <script src="jquery-1.12.1.min.js"></script>
     <script src="sprintf.js"></script>
     <script src="sjcl.js"></script>
@@ -18,20 +20,84 @@
 </head>
 <body>
 
-<form name="dataPost">
-    <label for="data">Data: </label>
-    <input type="text" id="plainData" name="plainData" size="20" title="PlainData" value=""/>
-    <input type="text" id="data" name="data" size="80" title="Data" value="6bc1bee22e409f96e93d7e117393172a"/>
-    <input type="button" id="btnProcessData" value="ProcessData"/>
-    <input type="button" id="btnProcessDataPadding" value="ProcessData (padding)"/>
-</form>
-<div id="status"></div>
+<div class="form-style-10">
+    <h1>EnigmaBridge API test<span>API usage demo</span></h1>
+    <form>
+        <div class="section"><span>1</span>Function input</div>
+        <div class="inner-wrap">
+            <label>
+                Plain data
+                <input type="text" name="plainData" id="plainData" placeholder="Plain data (can be empty)"/>
+                <span>Aux data, not protected by MAC or cipher</span>
+            </label>
+
+            <label>
+                Function input
+                <input type="text" name="data" id="data" placeholder="Function input"/>
+                <span>Input data to the <em>ProcessData()</em>. Will be encypted and MACed in transfer.
+                    TestVector: <a onclick="$('#data').val('6bc1bee22e409f96e93d7e117393172a');">6bc1bee22e409f96e93d7e117393172a</a>
+                </span>
+            </label>
+        </div>
+
+        <div class="section"><span>2</span>Configuration</div>
+        <div class="inner-wrap">
+            <label>API Key
+                <input type="text" name="apiKey" id="apiKey" value="TEST_API"/>
+                <span>Your EB API key</span>
+            </label>
+
+            <label>User object ID
+                <input type="text" name="userObjectID" id="userObjectID" value="EE01"/>
+                <span>Hexcoded user object ID stored in EB you want to work with</span>
+            </label>
+
+            <label>Endpoint
+                <input type="text" name="endpoint" id="endpoint" value="dragonfly.smarthsm.net"/>
+                <span>Hostname of the EB API</span>
+            </label>
+
+            <label>Method
+                <select id="requestMethod" name="requestMethod">
+                    <option value="POST">POST</option>
+                    <option value="GET">GET</option>
+                </select>
+            </label>
+
+            <label>AES encryption key
+                <input type="text" name="aesKey" id="aesKey" value="e134567890123456789012345678901234567890123456789012345678901234"/>
+                <span>Hexcoded encryption API key</span>
+            </label>
+
+            <label>MAC key
+                <input type="text" name="macKey" id="macKey" value="e224262820223456789012345678901234567890123456789012345678901234"/>
+                <span>Hexcoded hmac API key</span>
+            </label>
+
+        </div>
+        <div class="button-section">
+            <input type="button" id="btnProcessData" value="ProcessData"/>
+            <input type="button" id="btnProcessDataPadding" value="ProcessData (padding)"/>
+        </div>
+    </form>
+</div>
+
+<label for="reqRest">Request: </label>
+<div id="reqRest" class="logbox"></div>
+<br/>
+
+<label for="status">Log: </label>
+<div id="status" class="logbox"></div>
 
 <script>
     // Use server.js to start a new static page server with CORS (cross domain resource sharing).
     // UO Key: 11223344556677889900aabbccddeeff
     // CommKeyENC: e134567890123456789012345678901234567890123456789012345678901234
     // CommKeyMAC: e224262820223456789012345678901234567890123456789012345678901234
+
+    function set_request(msg){
+        $("#reqRest")[0].innerHTML = msg;
+    }
 
     function display_message(msg) {
         $("#status")[0].innerHTML = msg;
@@ -61,9 +127,13 @@
 
     function requestSimple(dataInp, plainDataInp, doPadding){
         h = sjcl.codec.hex;
-        var aesKey = "e134567890123456789012345678901234567890123456789012345678901234";
-        var macKey = "e224262820223456789012345678901234567890123456789012345678901234";
-        var keyId = 0xee01;
+        var apiKey = $('#apiKey').val();
+        var aesKey = $('#aesKey').val();
+        var macKey = $('#macKey').val();
+        var keyId = parseInt($('#userObjectID').val(), 16);
+        var endpoint = $('#endpoint').val();
+        var method = $('#requestMethod').val();
+
         var plainData = h.toBits(plainDataInp || "");
         var requestData = h.toBits(dataInp || ""); //sjcl.codec.utf8String.toBits(data);
 
@@ -73,6 +143,10 @@
             append_message("Padded req: " + h.fromBits(requestData));
         }
 
+        // Flush old messages.
+        display_message("");
+        set_request("");
+
         var logger = function(msg) {
             append_message(msg);
         };
@@ -80,13 +154,13 @@
         var request = new eb.comm.request();
         request.aesKey = aesKey;
         request.macKey = macKey;
-        request.apiKey = "API_TEST";
+        request.apiKey = apiKey;
         request.userObjectId = keyId;
 
         // Advanced settings.
-        request.remoteEndpoint = "dragonfly.smarthsm.net";
+        request.remoteEndpoint = endpoint;
         request.remotePort = 11180;
-        request.requestMethod = "POST";
+        request.requestMethod = method;
         request.requestScheme = "https";
         request.requestTimeout = 7000;
         request.callFunction = "ProcessData";
@@ -107,8 +181,15 @@
             console.log("it is over...");
         });
 
+        // Build the request so we can display request in the form.
+        request.build(plainData, requestData);
+        set_request(sprintf("%s<br/>\n%s<br/>\n%s<br/>\n",
+                request.getApiUrl(),
+                JSON.stringify(request.getApiRequestData()),
+                JSON.stringify(request.getSocketRequest())));
+
         // Do the call.
-        request.call(plainData, requestData);
+        request.call();
     }
 
     $(function(){
