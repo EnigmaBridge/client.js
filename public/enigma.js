@@ -504,6 +504,21 @@ eb.comm.response.prototype = {
      */
     isCodeOk: function(){
         return this.statusCode == 0x9000;
+    },
+
+    toString: function(){
+        return sprintf("Response{statusCode=%4X, statusDetail=%s, userObjectId: %08X, function: %s, " +
+            "nonce: %s, protectedData: %s, plainData: %s, mac: %s, computedMac: %s",
+            this.statusCode,
+            this.statusDetail,
+            this.userObjectID,
+            this.function,
+            sjcl.codec.hex.fromBits(this.nonce),
+            sjcl.codec.hex.fromBits(this.protectedData),
+            sjcl.codec.hex.fromBits(this.plainData),
+            sjcl.codec.hex.fromBits(this.mac),
+            sjcl.codec.hex.fromBits(this.computedMac)
+        );
     }
 };
 
@@ -950,7 +965,8 @@ eb.comm.request.prototype = {
 
             this.response = this.responseParser.parse(data);
             if (this.responseParser.success()) {
-                this._log("Processing complete, response: " + JSON.stringify(this.response));
+                this._log("Processing complete, response: " + this.response.toString());
+                // TODO: check nonce match & function match & userObjectId match.
                 if (this._doneCallback){
                     this._doneCallback(this.response, this, jqXHR)
                 }
