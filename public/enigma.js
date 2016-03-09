@@ -591,7 +591,7 @@ eb.comm.responseParser.prototype = {
         // Build new response message.
         var resp = this.response = new eb.comm.response();
         resp.statusCode = parseInt(data.status, 16);
-        resp.statusDetail = data.statusdetail | "";
+        resp.statusDetail = data.statusdetail || "";
         resp.function = data.function;
         if (!this.success()){
             this._log("Error in processing, status: " + data.status + ", message: " + resp.statusDetail);
