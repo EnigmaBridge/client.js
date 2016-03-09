@@ -956,9 +956,9 @@ eb.comm.request.prototype = {
                 }
 
             } else {
-                this._log("Failure, status: " + parser.statusCode);
+                this._log("Failure, status: " + this.responseParser.statusCode);
                 if (this._failCallback){
-                    this._failCallback(0x2, jqXHR, textStatus, null, this);
+                    this._failCallback(0x2, jqXHR, textStatus, this.response, this);
                 }
             }
 

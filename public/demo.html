@@ -20,8 +20,10 @@
 
 <form name="dataPost">
     <label for="data">Data: </label>
+    <input type="text" id="plainData" name="plainData" size="20" title="PlainData" value=""/>
     <input type="text" id="data" name="data" size="80" title="Data" value="6bc1bee22e409f96e93d7e117393172a"/>
-    <input type="submit" value="Submit"/>
+    <input type="button" id="btnProcessData" value="ProcessData"/>
+    <input type="button" id="btnProcessDataPadding" value="ProcessData (padding)"/>
 </form>
 <div id="status"></div>
 
@@ -31,8 +33,7 @@
     // CommKeyENC: e134567890123456789012345678901234567890123456789012345678901234
     // CommKeyMAC: e224262820223456789012345678901234567890123456789012345678901234
 
-    function display_message(msg)
-    {
+    function display_message(msg) {
         $("#status")[0].innerHTML = msg;
     }
 
@@ -47,10 +48,9 @@
         return date.getMonth()+1 + "/" + date.getDate() + "/" + date.getFullYear() + "  " + strTime;
     }
 
-    function append_message(msg)
-    {
+    function append_message(msg) {
         var status = $("#status");
-        var newMsg = formatDate(new Date()) + " " + msg;
+        var newMsg = formatDate(new Date()) + " - " + msg;
         status.html(status.html() + "<br/>\n" + newMsg);
     }
 
@@ -59,12 +59,20 @@
         append_message(msg);
     }
 
-    function requestSimple(data){
+    function requestSimple(dataInp, plainDataInp, doPadding){
+        h = sjcl.codec.hex;
         var aesKey = "e134567890123456789012345678901234567890123456789012345678901234";
         var macKey = "e224262820223456789012345678901234567890123456789012345678901234";
         var keyId = 0xee01;
-        var plainData = sjcl.codec.utf8String.toBits("");
-        var requestData = sjcl.codec.hex.toBits(data); //sjcl.codec.utf8String.toBits(data);
+        var plainData = h.toBits(plainDataInp || "");
+        var requestData = h.toBits(dataInp || ""); //sjcl.codec.utf8String.toBits(data);
+
+        if (doPadding){
+            pad = eb.padding.pkcs7;
+            requestData = pad.pad(requestData);
+            append_message("Padded req: " + h.fromBits(requestData));
+        }
+
         var logger = function(msg) {
             append_message(msg);
         };
@@ -107,10 +115,14 @@
         // Start random number collectors.
         sjcl.random.startCollectors();
 
-        // Submit button action.
-        $('form[name=dataPost]').submit(function(){
-            requestSimple($(this).find('#data').val());
-            return false;
+        // Button click handling.
+        // in form search: $(this).find('#data').val());
+        $('#btnProcessData').click(function(){
+            requestSimple($('#data').val(), $('#plainData').val(), false);
+        });
+
+        $('#btnProcessDataPadding').click(function(){
+            requestSimple($('#data').val(), $('#plainData').val(), true);
         });
     });
 
