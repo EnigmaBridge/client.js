@@ -495,7 +495,7 @@ eb.comm.response.prototype = {
             && this.computedMac
             && ba.bitLength(this.mac) == 16*8
             && ba.bitLength(this.computedMac) == 16*8
-            && ba.equal(resp.mac, resp.computedMac);
+            && ba.equal(this.mac, this.computedMac);
     },
 
     /**
