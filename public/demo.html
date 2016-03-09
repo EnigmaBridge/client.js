@@ -76,6 +76,13 @@
                 </select>
             </label>
 
+            <label>Scheme
+                <select id="requestScheme" name="requestScheme">
+                    <option value="https">https</option>
+                    <option value="http">http</option>
+                </select>
+            </label>
+
             <label>AES encryption key
                 <input type="text" name="aesKey" id="aesKey" value="e134567890123456789012345678901234567890123456789012345678901234"/>
                 <span>Hexcoded encryption API key</span>
@@ -143,6 +150,7 @@
         var keyId = parseInt($('#userObjectID').val(), 16);
         var endpoint = $('#endpoint').val();
         var method = $('#requestMethod').val();
+        var scheme = $('#requestScheme').val();
 
         var plainData = h.toBits(plainDataInp || "");
         var requestData = h.toBits(dataInp || ""); //sjcl.codec.utf8String.toBits(data);
@@ -171,7 +179,7 @@
         request.remoteEndpoint = endpoint;
         request.remotePort = 11180;
         request.requestMethod = method;
-        request.requestScheme = "https";
+        request.requestScheme = scheme;
         request.requestTimeout = 7000;
         request.callFunction = "ProcessData";
         request.callRequestType = "PLAINAES";
