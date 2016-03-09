@@ -463,7 +463,7 @@ eb.comm.response.prototype = {
      * USerObjectID parsed from the response.
      * Ingeter, 4B.
      */
-    userObjectID: "",
+    userObjectID: 0,
 
     /**
      * Nonce parsed from the RAW response.
@@ -637,8 +637,8 @@ eb.comm.responseParser.prototype = {
         }
 
         // Get user object.
-        resp.userObjectId = ba.extract32(decryptedData, 8);
-        this._log("returnedUserObject: " + sprintf("%08x", resp.userObjectId));
+        resp.userObjectID = ba.extract32(decryptedData, 8);
+        this._log("returnedUserObject: " + sprintf("%08x", resp.userObjectID));
 
         // Get nonce, mangled.
         var returnedMangledNonce = ba.bitSlice(decryptedData, 5*8, 5*8+8*8);
