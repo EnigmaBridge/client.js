@@ -1,37 +1,32 @@
 /**
  * EnigmaBridge API helper functions.
+ * @author Dusan Klinec (ph4r05)
+ * @license GPL3.
  */
-
-
-String.prototype.hexEncode = function(){
-    var hex, i;
-
-    var result = "";
-    for (i=0; i<this.length; i++) {
-        hex = this.charCodeAt(i).toString(16);
-        result += ("000"+hex).slice(-4);
-    }
-
-    return result
-};
-
-String.prototype.hexDecode = function(){
-    var j;
-    var hexes = this.match(/.{1,4}/g) || [];
-    var back = "";
-    for(j = 0; j<hexes.length; j++) {
-        back += String.fromCharCode(parseInt(hexes[j], 16));
-    }
-
-    return back;
-};
 
 /**
  * Base EB package.
  * @type {{name: string}}
  */
 eb = {
-    name: "EB"
+    name: "EB",
+    /** @namespace Exceptions. */
+    exception: {
+        /** @constructor Ciphertext is corrupt. */
+        corrupt: function (message) {
+            this.toString = function () {
+                return "CORRUPT: " + this.message;
+            };
+            this.message = message;
+        },
+        /** @constructor Invalid input. */
+        invalid: function (message) {
+            this.toString = function () {
+                return "INVALID: " + this.message;
+            };
+            this.message = message;
+        },
+    }
 };
 
 /**
@@ -279,7 +274,7 @@ eb.comm = {
 };
 
 /**
- * EB request builder.
+ * Raw EB request builder.
  * @param nonce
  * @param aesKey
  * @param macKey
@@ -297,36 +292,43 @@ eb.comm.requestBuilder = function(nonce, aesKey, macKey, userObjectId, reqType){
 eb.comm.requestBuilder.prototype = {
     /**
      * User object ID, integer type.
+     * @input
      */
     userObjectId : -1,
 
     /**
      * AES communication encryption key, hexcoded string.
+     * @input
      */
     aesKey: "",
 
     /**
      * AES MAC communication key, hexcoded string.
+     * @input
      */
     macKey: "",
 
     /**
      * Freshness nonce / IV, hexcoded string.
+     * @input
      */
     nonce: "",
 
     /**
      * Request type. PLAINAES by default.
+     * @input
      */
     reqType: "",
 
     /**
      * If set to true, request body building steps are logged.
+     * @input
      */
     debuggingLog: false,
 
     /**
      * Aux logging function
+     * @input
      */
     logger: null,
 
@@ -430,7 +432,89 @@ eb.comm.requestBuilder.prototype = {
 };
 
 /**
- * Response parser.
+ * Base class for parsed raw EB response.
+ */
+eb.comm.response = function(){
+
+};
+
+eb.comm.response.prototype = {
+    /**
+     * Parsed status code. 0x9000 = OK.
+     * @output
+     */
+    statusCode: 0,
+
+    /**
+     * Parsed status detail.
+     * @output
+     */
+    statusDetail: "",
+
+    /**
+     * Plain data parsed from the response.
+     * Protected by MAC, not encrypted.
+     * @output
+     */
+    plainData: "",
+
+    /**
+     * Protected data parsed from the response.
+     * Protected by MAC, encrypted in transit.
+     * @output
+     */
+    protectedData: "",
+
+    /**
+     * USerObjectID parsed from the response.
+     * Ingeter, 4B.
+     */
+    userObjectID: "",
+
+    /**
+     * Nonce parsed from the RAW response.
+     */
+    nonce: "",
+
+    /**
+     * Function name extracted from the request.
+     */
+    function: "",
+
+    /**
+     * MAC value parsed from the message.
+     * If macOk is true, it is same as computed MAC.
+     */
+    mac: "",
+
+    /**
+     * Computed MAC value for the message.
+     */
+    computedMac: "",
+
+    /**
+     * Returns true if MAC verification is OK.
+     */
+    isMacOk: function(){
+        ba = sjcl.bitArray;
+        return this.mac
+            && this.computedMac
+            && ba.bitLength(this.mac) == 16*8
+            && ba.bitLength(this.computedMac) == 16*8
+            && ba.equal(resp.mac, resp.computedMac);
+    },
+
+    /**
+     * Returns true if after parsing, code is OK.
+     * @returns {boolean}
+     */
+    isCodeOk: function(){
+        return this.statusCode == 0x9000;
+    }
+};
+
+/**
+ * Raw EB Response parser.
  * @param aesKey
  * @param macKey
  */
@@ -442,46 +526,36 @@ eb.comm.responseParser = function(aesKey, macKey){
 eb.comm.responseParser.prototype = {
     /**
      * Parsed user object ID, integer type.
+     * @input
      */
     userObjectId : -1,
 
     /**
-     * INPUT: AES communication encryption key, hexcoded string.
+     * AES communication encryption key, hexcoded string.
+     * @input
      */
     aesKey: "",
 
     /**
-     * INPUT: AES MAC communication key, hexcoded string.
+     * AES MAC communication key, hexcoded string.
+     * @input
      */
     macKey: "",
 
     /**
-     * Parsed freshness nonce / IV, hexcoded string.
+     * Parsed response
      */
-    nonce: "",
-
-    /**
-     * Parsed function
-     */
-    function: "",
-
-    /**
-     * Parsed status code. 0x9000 = OK.
-     */
-    statusCode: 0,
-
-    /**
-     * Parsed status detail.
-     */
-    statusDetail: "",
+    response: null,
 
     /**
      * If set to true, response body parsing steps are logged to the console.
+     * @input
      */
     debuggingLog: false,
 
     /**
      * Aux logging function
+     * @input
      */
     logger: null,
 
@@ -490,7 +564,7 @@ eb.comm.responseParser.prototype = {
      * @returns {boolean}
      */
     success: function(){
-        return this.statusCode == 0x9000;
+        return this.response.isCodeOk();
     },
 
     /**
@@ -504,12 +578,14 @@ eb.comm.responseParser.prototype = {
             throw new sjcl.exception.invalid("response data invalid");
         }
 
-        this.statusCode = parseInt(data.status, 16);
-        this.statusDetail = data.statusdetail | "";
-        this.function = data.function;
+        // Build new response message.
+        var resp = this.response = new eb.comm.response();
+        resp.statusCode = parseInt(data.status, 16);
+        resp.statusDetail = data.statusdetail | "";
+        resp.function = data.function;
         if (!this.success()){
-            this._log("Error in processing, status: " + data.status + ", message: " + this.statusDetail);
-            return;
+            this._log("Error in processing, status: " + data.status + ", message: " + resp.statusDetail);
+            return resp;
         }
 
         var resultBuffer = data.result;
@@ -542,15 +618,15 @@ eb.comm.responseParser.prototype = {
             dataToMac = pad.pad(dataToMac);
         }
 
-        var returnedMac = ba.bitSlice(protectedBits, macTagOffset);
-        if (ba.bitLength(returnedMac) != 16*8){
+        resp.mac = ba.bitSlice(protectedBits, macTagOffset);
+        if (ba.bitLength(resp.mac) != 16*8){
             throw new sjcl.exception.corrupt("MAC corrupted");
         }
 
-        var computedMac = hmac.mac(dataToMac);
-        this._log("returnedMac: " + h.fromBits(returnedMac));
-        this._log("computedMac: " + h.fromBits(computedMac));
-        if (!returnedMac || !ba.equal(returnedMac, computedMac)){
+        resp.computedMac = hmac.mac(dataToMac);
+        this._log("returnedMac: " + h.fromBits(resp.mac));
+        this._log("computedMac: " + h.fromBits(resp.computedMac));
+        if (!resp.mac || !ba.equal(resp.mac, resp.computedMac)){
             throw new sjcl.exception.corrupt("Padding is not valid"); //TODO: padding oracle?
         }
 
@@ -572,20 +648,20 @@ eb.comm.responseParser.prototype = {
         }
 
         // Get user object.
-        self.userObjectId = ba.extract32(decryptedData, 8);
-        this._log("returnedUserObject: " + sprintf("%08x", self.userObjectId));
+        resp.userObjectId = ba.extract32(decryptedData, 8);
+        this._log("returnedUserObject: " + sprintf("%08x", resp.userObjectId));
 
         // Get nonce, mangled.
         var returnedMangledNonce = ba.bitSlice(decryptedData, 5*8, 5*8+8*8);
-        this.nonce = eb.comm.demangleNonce(returnedMangledNonce);
-        this._log("returnedNonce: " + h.fromBits(this.nonce));
+        resp.nonce = eb.comm.demangleNonce(returnedMangledNonce);
+        this._log("returnedNonce: " + h.fromBits(resp.nonce));
 
         // Response = plainData + decryptedData.
-        var responseUnprotected = ba.bitSlice(decryptedData, 5*8+8*8);
-        var responseData = ba.concat(plainBits, responseUnprotected);
-        this._log("responseData: " + h.fromBits(responseUnprotected));
+        resp.protectedData = ba.bitSlice(decryptedData, 5*8+8*8);
+        resp.plainData = plainBits;
+        this._log("responseData: " + h.fromBits(resp.protectedData));
 
-        return responseData;
+        return resp;
     },
 
     _log:  function(x) {
@@ -603,3 +679,392 @@ eb.comm.responseParser.prototype = {
     }
 };
 
+/**
+ * EB request builder.
+ * @param apiKey
+ * @param aesKey
+ * @param macKey
+ * @param userObjectId
+ */
+eb.comm.request = function(apiKey, aesKey, macKey, userObjectId){
+    this.apiKey = apiKey || "";
+    this.aesKey = aesKey || "";
+    this.macKey = macKey || "";
+    this.userObjectId = userObjectId || -1;
+};
+
+eb.comm.request.prototype = {
+    /**
+     * User object ID to perform operation with, integer type.
+     * @input
+     */
+    userObjectId : -1,
+
+    /**
+     * AES communication encryption key, hexcoded string.
+     * @input
+     */
+    aesKey: "",
+
+    /**
+     * AES MAC communication key, hexcoded string.
+     * @input
+     */
+    macKey: "",
+
+    /**
+     * Function to call
+     * @input
+     * @default ProcessData
+     */
+    callFunction: "ProcessData",
+
+    /**
+     * Type of the data request.
+     * @input
+     * @default PLAINAES
+     */
+    callRequestType: "PLAINAES",
+
+    /**
+     * User API key
+     * @input
+     */
+    apiKey: "",
+
+    /**
+     * Response object produced by response parser
+     * @output
+     */
+    response: null,
+
+    /**
+     * Method to do REST request with. GET or POST are allowed.
+     * @input
+     */
+    requestMethod: "POST",
+
+    /**
+     * Scheme used to contact remote API.
+     * @input
+     * @default https
+     */
+    requestScheme: "https",
+
+    /**
+     * Request timeout in milliseconds.
+     * @input
+     * @default 30000
+     */
+    requestTimeout: 30000,
+
+    /**
+     * Endpoint where EB API listens
+     * @input
+     */
+    remoteEndpoint: "dragonfly.smarthsm.net",
+
+    /**
+     * Port of the remote endpoint
+     * @input
+     * @default 11180
+     */
+    remotePort: 11180,
+
+    /**
+     * Ajax call settings. User can modify default behavior by specifying settings here.
+     * @input
+     */
+    ajaxSettings: {},
+
+    /**
+     * If set to true, request body building steps are logged.
+     * @input
+     */
+    debuggingLog: false,
+
+    /**
+     * Aux logging function
+     * @input
+     */
+    logger: null,
+
+    /**
+     * Request builder used to build the request.
+     * @output
+     */
+    requestBuilder: null,
+
+    /**
+     * Response parser parsing raw EB response.
+     * @output
+     */
+    responseParser: null,
+
+    /**
+     * Composite API key for the request.
+     * Generated before request is sent.
+     * @private
+     */
+    _apiKeyReq: "",
+
+    /**
+     * Socket equivalent request, for debugging.
+     * Generated when building the request.
+     * @private
+     */
+    _socketRequest: "",
+
+    /**
+     * Request block generated by request builder.
+     * @private
+     */
+    _requestBlock: "",
+
+    /**
+     * Version of EB API.
+     * @private
+     */
+    _apiVersion: "1.0",
+
+    _doneCallback: function(response, requestObj, jqXHR){},
+    _failCallback: function(failType, jqXHR, textStatus, errorThrown, requestObj){},
+    _alwaysCallback: function(requestObj){},
+
+    done: function(x){
+        this._doneCallback = x;
+        return this;
+    },
+
+    fail: function(x){
+        this._failCallback = x;
+        return this;
+    },
+
+    always: function(x){
+        this._alwaysCallback = x;
+        return this;
+    },
+
+    /**
+     * Returns nonce from the request builder. If set.
+     * @returns {*}
+     */
+    getNonce: function(){
+        if (this.requestBuilder == null){
+            return null;
+        }
+
+        return this.requestBuilder.nonce;
+    },
+
+    /**
+     * Generates new nonce to the request builder.
+     * If request builder is null, new is constructed.
+     * @returns {string|*|string}
+     */
+    genNonce: function(){
+        if (this.requestBuilder == null){
+            this.requestBuilder = new eb.comm.requestBuilder();
+        }
+
+        this.requestBuilder.nonce = eb.misc.genHexNonce(16);
+        return this.requestBuilder.nonce;
+    },
+
+    /**
+     * Returns if the EB returned with success.
+     * Note: Data still may have invalid MAC.
+     * @returns {*|boolean}
+     */
+    wasSuccessful: function(){
+        return this.responseParser.success();
+    },
+
+    /**
+     * Builds EB request.
+     *
+     * @param plainData - bitArray of the plaintext data (will be MAC protected).
+     * @param requestData - bitArray with userdata to perform operation on (will be encrypted, MAC protected)
+     * @returns request body string.
+     */
+    call: function(plainData, requestData){
+        this._apiKeyReq = sprintf("%s%010x", this.apiKey, this.userObjectId);
+
+        // Build a new EB request.
+        this.requestBuilder = new eb.comm.requestBuilder();
+        this.requestBuilder.aesKey = this.aesKey;
+        this.requestBuilder.macKey = this.macKey;
+        this.requestBuilder.userObjectId = this.userObjectId;
+        this.requestBuilder.reqType = this.callRequestType;
+        this.requestBuilder.debuggingLog = this.debuggingLog;
+        this.requestBuilder.logger = this.logger;
+        this.requestBuilder.genNonce();
+
+        this._requestBlock = this.requestBuilder.build(plainData, requestData);
+        var nonce = this.requestBuilder.nonce;
+        this._log("Nonce generated: " + nonce);
+
+        var url = this._getApiUrl();
+        var apiData = this._getApiRequestData();
+
+        this._log("URL: " + url + ", method: " + this.requestMethod);
+        this._log("UserData: " + JSON.stringify(apiData));
+        this._log("SocketReq: " + JSON.stringify(this._getSocketRequest()));
+
+        var ajaxSettings = {
+            url: url,
+            type: this.requestMethod,
+            dataType: 'json',
+            timeout: this.requestTimeout,
+            data: this.requestMethod == "POST" ? JSON.stringify(apiData) : null
+        };
+
+        // Extend ajax settings with user provided settings.
+        $.extend(ajaxSettings, this.ajaxSettings | {});
+        var ebc = this;
+
+        // Do the remote call
+        $.ajax(ajaxSettings)
+            .done(function (data, textStatus, jqXHR) {
+                ebc._log("Request done. Status: " + textStatus);
+                ebc._log("Raw response: " + JSON.stringify(data));
+                ebc._processAnswer(data, textStatus, jqXHR);
+
+            }).fail(function (jqXHR, textStatus, errorThrown) {
+                ebc._log("Error: " + sprintf("Error: status=%d, responseText: %s, error: %s, status: %s", jqXHR.status, jqXHR.responseText, errorThrown, textStatus));
+                if (this._failCallback) {
+                    this._failCallback(0x1, jqXHR, textStatus, errorThrown, ebc);
+                }
+
+            }).always(function (data, textStatus, jqXHR) {
+                if (this._alwaysCallback) {
+                    this._alwaysCallback(ebc);
+                }
+            });
+    },
+
+    /**
+     * Processing response from the server.
+     * @private
+     */
+    _processAnswer: function(data, textStatus, jqXHR){
+        try {
+            h = sjcl.codec.hex;
+
+            // Build a new EB request.
+            this.responseParser = new eb.comm.responseParser();
+            this.responseParser.aesKey = this.aesKey;
+            this.responseParser.macKey = this.macKey;
+            this.responseParser.debuggingLog = true;
+            this.responseParser.logger = this.logger;
+
+            this.response = this.responseParser.parse(data);
+            if (this.responseParser.success()) {
+                this._log("Processing complete, response: " + JSON.stringify(this.response));
+                if (this._doneCallback){
+                    this._doneCallback(this.response, this, jqXHR)
+                }
+
+            } else {
+                this._log("Failure, status: " + parser.statusCode);
+                if (this._failCallback){
+                    this._failCallback(0x2, jqXHR, textStatus, null, this);
+                }
+            }
+
+        } catch(e){
+            this._log("Excetion when processing the response: " + e);
+            if (this._failCallback){
+                this._failCallback(0x3, jqXHR, textStatus, e, this);
+            }
+        }
+    },
+
+    /**
+     * Returns remote API URL to query with Ajax.
+     * According to current request settings.
+     * Note: Request has to be built when calling this function.
+     *
+     * @returns {*}
+     * @private
+     */
+    _getApiUrl: function(){
+        if (this.requestMethod == "POST"){
+            return sprintf("%s://%s:%d/%s/%s/%s/%s",
+                this.requestScheme,
+                this.remoteEndpoint,
+                this.remotePort,
+                this._apiKeyReq,
+                this._apiVersion,
+                this.callFunction,
+                this.getNonce());
+
+        } else if (this.requestMethod == "GET"){
+            return sprintf("%s://%s:%d/%s/%s/%s/%s/%s",
+                this.requestScheme,
+                this.remoteEndpoint,
+                this.remotePort,
+                this._apiKeyReq,
+                this._apiVersion,
+                this.callFunction,
+                this.getNonce(),
+                this._requestBlock);
+
+        } else {
+            throw new eb.exception.invalid("Invalid configuration, unknown method: " + this.requestMethod);
+        }
+    },
+
+    /**
+     * Returns Ajax request data.
+     * According to current request settings.
+     * Note: Request has to be built when calling this function.
+     *
+     * @returns {*}
+     * @private
+     */
+    _getApiRequestData: function(){
+        if (this.requestMethod == "POST") {
+            return {data: this._requestBlock};
+        } else {
+            return {};
+        }
+    },
+
+    /**
+     * Returns raw EB request for raw socket transport method.
+     * For debugging & verification.
+     *
+     * @returns {string}
+     * @private
+     */
+    _getSocketRequest: function(){
+        this._socketRequest = {
+            objectid:this._apiKeyReq,
+            data:this._requestBlock,
+            function:this.callFunction,
+            nonce:this.getNonce(),
+            version:this._apiVersion};
+        return this._socketRequest;
+    },
+
+    /**
+     * Logger wrapper. Allowing to log messages both to console and provided logger.
+     * @param x message to log.
+     * @private
+     */
+    _log:  function(x) {
+        if (!this.debuggingLog){
+            return;
+        }
+
+        if (console && console.log){
+            console.log(x);
+        }
+
+        if (this.logger){
+            this.logger(x);
+        }
+    }
+};

@@ -59,14 +59,7 @@
         append_message(msg);
     }
 
-    function doRequest(data)
-    {
-        // Sanity checks
-        if (!data)
-            return append_message("Data is empty");
-
-        // Keys
-        var aesAppKey = "11223344556677889900aabbccddeeff";
+    function requestSimple(data){
         var aesKey = "e134567890123456789012345678901234567890123456789012345678901234";
         var macKey = "e224262820223456789012345678901234567890123456789012345678901234";
         var keyId = 0xee01;
@@ -76,99 +69,38 @@
             append_message(msg);
         };
 
-        //<userAPI>/<version>/ProcessData/<nonce>
-        var apiKey = sprintf("%s%010x", "API_TEST", keyId);
-        var apiVersion = "1.0";
-        var command = "ProcessData";
+        var request = new eb.comm.request();
+        request.aesKey = aesKey;
+        request.macKey = macKey;
+        request.apiKey = "API_TEST";
+        request.userObjectId = keyId;
 
-        // Build a new EB request.
-        var reqBuilder = new eb.comm.requestBuilder();
-        reqBuilder.aesKey = aesKey;
-        reqBuilder.macKey = macKey;
-        reqBuilder.userObjectId = keyId;
-        reqBuilder.reqType = "PLAINAES";
-        reqBuilder.debuggingLog = true;
-        reqBuilder.logger = logger;
-        reqBuilder.nonce = "0000000000000000"; // for testing only.
-        reqBuilder.genNonce();
+        // Advanced settings.
+        request.remoteEndpoint = "dragonfly.smarthsm.net";
+        request.remotePort = 11180;
+        request.requestMethod = "POST";
+        request.requestScheme = "https";
+        request.requestTimeout = 7000;
+        request.callFunction = "ProcessData";
+        request.callRequestType = "PLAINAES";
 
-        var requestBlock = reqBuilder.build(plainData, requestData);
-        var nonce = reqBuilder.nonce;
+        // Logging settings.
+        request.debuggingLog = true;
+        request.logger = logger;
 
-        log("Nonce: " + nonce);
-        log("request block: " + requestBlock);
+        // Callbacks settings.
+        request.done(function(response, requestObj, jqXHR) {
+            console.log("DONE! " + JSON.stringify(response));
 
-        // AJAX call
-        var method = "POST";
-        var endpointUrl;
-        var endpointRequestData;
-        if (method == "POST"){
-            endpointUrl = sprintf("https://dragonfly.smarthsm.net:11180/%s/%s/%s/%s",
-                    apiKey, apiVersion, command, nonce);
-            endpointRequestData = {data: requestBlock};
+        }).fail(function(failType, jqXHR, textStatus, errorThrown, requestObj){
+            console.log("fail! type=" + failType);
 
-        } else if (method == "GET"){
-            endpointUrl = sprintf("https://dragonfly.smarthsm.net:11180/%s/%s/%s/%s/%s",
-                    apiKey, apiVersion, command, nonce, requestBlock);
-            endpointRequestData = {};
-
-        }
-
-        log("URL: " + endpointUrl + ", method: " + method);
-        log("UserData: " + JSON.stringify(endpointRequestData));
-
-        // Build JSON request for pure socket query
-        socketReq = {
-            objectid:apiKey,
-            data:requestBlock,
-            function:command,
-            nonce:nonce,
-            version:apiVersion};
-        log("SocketReq: " + JSON.stringify(socketReq));
-
-        // Testvector:   {"objectid":"API_TEST0000005544","data":"Packet0_PLAINAES_00004bcd596b3afe9ab1ca440061edcb41729c5a700afdb611175f7543cafcc0e69ee2f07a1b8bf7a9e729523eb38af5f90a","function":"ProcessData","nonce":"334613358783577","version":"1.0"}
-        // Testresponse: {"function":"ProcessData","result":"0000d2953f6701ec054e95a0ea6b3760c9598b0e69177cae18d13b9004574ae7d6a746ae82c876167f6c9bf74a1fd162d779_Packet0_PLAINAES_","status":"9000","statusdetail":"(OK)SW_STAT_OK","version":"1.0"}
-        processAnswer = function(data){
-            h = sjcl.codec.hex;
-
-            // Build a new EB request.
-            var parser = new eb.comm.responseParser();
-            parser.aesKey = aesKey;
-            parser.macKey = macKey;
-            parser.debuggingLog = true;
-            parser.logger = logger;
-
-            var responseBody = parser.parse(data);
-            if (parser.success()){
-                log("Processing complete, response: " + h.fromBits(responseBody));
-
-            } else {
-                log("Failure, status: " + parser.statusCode);
-
-            }
-        };
-
-        // Do the remote call
-        $.ajax({
-            url: endpointUrl,
-            type: method,
-            dataType: 'json',
-            data: method == "POST" ? JSON.stringify(endpointRequestData) : null,
-            timeout: 7000
-        }).done(function(data, textStatus, jqXHR){
-            log("Done: " + textStatus);
-            append_message("Raw response: " + JSON.stringify(data));
-            processAnswer(data);
-
-        }).fail(function(jqXHR, textStatus, errorThrown) {
-            var msg = sprintf("Error: status=%d, responseText: %s, error: %s, status: %s",
-                    jqXHR.status, jqXHR.responseText, errorThrown, textStatus);
-
-            log("Error: " + msg);
-
-        }).always(function(data, textStatus, jqXHR) {
-            log("Complete");
+        }).always(function(request){
+            console.log("it is over...");
         });
+
+        // Do the call.
+        request.call(plainData, requestData);
     }
 
     $(function(){
@@ -177,7 +109,7 @@
 
         // Submit button action.
         $('form[name=dataPost]').submit(function(){
-            doRequest($(this).find('#data').val());
+            requestSimple($(this).find('#data').val());
             return false;
         });
     });
