@@ -507,8 +507,8 @@ eb.comm.response.prototype = {
     },
 
     toString: function(){
-        return sprintf("Response{statusCode=%4X, statusDetail=%s, userObjectId: %08X, function: %s, " +
-            "nonce: %s, protectedData: %s, plainData: %s, mac: %s, computedMac: %s",
+        return sprintf("Response{statusCode=%4X, statusDetail=[%s], userObjectId: %08X, function: [%s], " +
+            "nonce: [%s], protectedData: [%s], plainData: [%s], mac: [%s], computedMac: [%s], macOK: %d",
             this.statusCode,
             this.statusDetail,
             this.userObjectID,
@@ -517,7 +517,8 @@ eb.comm.response.prototype = {
             sjcl.codec.hex.fromBits(this.protectedData),
             sjcl.codec.hex.fromBits(this.plainData),
             sjcl.codec.hex.fromBits(this.mac),
-            sjcl.codec.hex.fromBits(this.computedMac)
+            sjcl.codec.hex.fromBits(this.computedMac),
+            this.isMacOk()
         );
     }
 };
