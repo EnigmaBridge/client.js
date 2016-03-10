@@ -109,6 +109,7 @@
 <div id="status" class="logbox"></div>
 
 <script>
+    "use strict";
     // Use server.js to start a new static page server with CORS (cross domain resource sharing).
     // UO Key: 11223344556677889900aabbccddeeff
     // CommKeyENC: e134567890123456789012345678901234567890123456789012345678901234
@@ -143,7 +144,7 @@
     }
 
     function requestSimple(dataInp, plainDataInp, doPadding){
-        h = sjcl.codec.hex;
+        var h = sjcl.codec.hex;
         var apiKey = $('#apiKey').val();
         var aesKey = $('#aesKey').val();
         var macKey = $('#macKey').val();
@@ -156,7 +157,7 @@
         var requestData = h.toBits(dataInp || ""); //sjcl.codec.utf8String.toBits(data);
 
         if (doPadding){
-            pad = eb.padding.pkcs7;
+            var pad = eb.padding.pkcs7;
             requestData = pad.pad(requestData);
             append_message("Padded req: " + h.fromBits(requestData));
         }
