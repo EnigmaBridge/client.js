@@ -631,8 +631,6 @@ eb.comm.responseParser.prototype = {
         }
 
         resp.computedMac = hmac.mac(dataToMac);
-        this._log("returnedMac: " + h.fromBits(resp.mac));
-        this._log("computedMac: " + h.fromBits(resp.computedMac));
         if (!resp.mac || !ba.equal(resp.mac, resp.computedMac)){
             throw new sjcl.exception.corrupt("Padding is not valid"); //TODO: padding oracle?
         }
@@ -656,12 +654,10 @@ eb.comm.responseParser.prototype = {
 
         // Get user object.
         resp.userObjectID = ba.extract32(decryptedData, 8);
-        this._log("returnedUserObject: " + sprintf("%08x", resp.userObjectID));
 
         // Get nonce, mangled.
         var returnedMangledNonce = ba.bitSlice(decryptedData, 5*8, 5*8+8*8);
         resp.nonce = eb.comm.demangleNonce(returnedMangledNonce);
-        this._log("returnedNonce: " + h.fromBits(resp.nonce));
 
         // Response = plainData + decryptedData.
         resp.protectedData = ba.bitSlice(decryptedData, 5*8+8*8);
@@ -809,6 +805,12 @@ eb.comm.request.prototype = {
     responseParser: null,
 
     /**
+     * Request start time. Measure how long it took.
+     * @output
+     */
+    requestTime: 0,
+
+    /**
      * Composite API key for the request.
      * Generated before request is sent.
      * @private
@@ -947,13 +949,16 @@ eb.comm.request.prototype = {
 
         // Do the remote call
         this._log("Sending remote request...");
+        this.requestTime = new Date().getTime();
         $.ajax(ajaxSettings)
             .done(function (data, textStatus, jqXHR) {
-                ebc._log("Request done. Status: " + textStatus);
+                ebc._requestFinished();
+                ebc._log("Response status: " + textStatus);
                 ebc._log("Raw response: " + JSON.stringify(data));
                 ebc._processAnswer(data, textStatus, jqXHR);
 
             }).fail(function (jqXHR, textStatus, errorThrown) {
+                ebc._requestFinished();
                 ebc._log("Error: " + sprintf("Error: status=[%d], responseText: [%s], error: [%s], status: [%s] misc: %s",
                         jqXHR.status, jqXHR.responseText, errorThrown, textStatus, JSON.stringify(jqXHR)));
 
@@ -966,6 +971,15 @@ eb.comm.request.prototype = {
                     this._alwaysCallback(ebc);
                 }
             });
+    },
+
+    /**
+     * Request finished, measure time.
+     * @private
+     */
+    _requestFinished: function(){
+        this.requestTime = (new Date().getTime() - this.requestTime);
+        this._log("Request finished in " + this.requestTime + " ms");
     },
 
     /**
