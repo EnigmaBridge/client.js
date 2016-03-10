@@ -495,7 +495,7 @@ eb.comm.response.prototype = {
             && this.computedMac
             && ba.bitLength(this.mac) == 16*8
             && ba.bitLength(this.computedMac) == 16*8
-            && ba.equal(resp.mac, resp.computedMac);
+            && ba.equal(this.mac, this.computedMac);
     },
 
     /**
@@ -507,8 +507,8 @@ eb.comm.response.prototype = {
     },
 
     toString: function(){
-        return sprintf("Response{statusCode=%4X, statusDetail=%s, userObjectId: %08X, function: %s, " +
-            "nonce: %s, protectedData: %s, plainData: %s, mac: %s, computedMac: %s",
+        return sprintf("Response{statusCode=%4X, statusDetail=[%s], userObjectId: %08X, function: [%s], " +
+            "nonce: [%s], protectedData: [%s], plainData: [%s], mac: [%s], computedMac: [%s], macOK: %d",
             this.statusCode,
             this.statusDetail,
             this.userObjectID,
@@ -517,7 +517,8 @@ eb.comm.response.prototype = {
             sjcl.codec.hex.fromBits(this.protectedData),
             sjcl.codec.hex.fromBits(this.plainData),
             sjcl.codec.hex.fromBits(this.mac),
-            sjcl.codec.hex.fromBits(this.computedMac)
+            sjcl.codec.hex.fromBits(this.computedMac),
+            this.isMacOk()
         );
     }
 };
@@ -590,7 +591,7 @@ eb.comm.responseParser.prototype = {
         // Build new response message.
         var resp = this.response = new eb.comm.response();
         resp.statusCode = parseInt(data.status, 16);
-        resp.statusDetail = data.statusdetail | "";
+        resp.statusDetail = data.statusdetail || "";
         resp.function = data.function;
         if (!this.success()){
             this._log("Error in processing, status: " + data.status + ", message: " + resp.statusDetail);
@@ -886,13 +887,12 @@ eb.comm.request.prototype = {
     },
 
     /**
-     * Builds EB request.
-     *
-     * @param plainData - bitArray of the plaintext data (will be MAC protected).
-     * @param requestData - bitArray with userdata to perform operation on (will be encrypted, MAC protected)
-     * @returns request body string.
+     * Initializes state and builds request
+     * @param plainData
+     * @param requestData
      */
-    call: function(plainData, requestData){
+    build: function(plainData, requestData){
+        this._log("Building request body");
         this._apiKeyReq = sprintf("%s%010x", this.apiKey, this.userObjectId);
 
         // Build a new EB request.
@@ -909,13 +909,28 @@ eb.comm.request.prototype = {
         var nonce = this.requestBuilder.nonce;
         this._log("Nonce generated: " + nonce);
 
-        var url = this._getApiUrl();
-        var apiData = this._getApiRequestData();
+        var url = this.getApiUrl();
+        var apiData = this.getApiRequestData();
 
         this._log("URL: " + url + ", method: " + this.requestMethod);
         this._log("UserData: " + JSON.stringify(apiData));
-        this._log("SocketReq: " + JSON.stringify(this._getSocketRequest()));
+        this._log("SocketReq: " + JSON.stringify(this.getSocketRequest()));
+    },
 
+    /**
+     * Builds EB request.
+     *
+     * @param plainData - bitArray of the plaintext data (will be MAC protected).
+     * @param requestData - bitArray with userdata to perform operation on (will be encrypted, MAC protected)
+     * @returns request body string.
+     */
+    call: function(plainData, requestData){
+        if (!this._apiKeyReq){
+            this.build(plainData, requestData);
+        }
+
+        var url = this.getApiUrl();
+        var apiData = this.getApiRequestData();
         var ajaxSettings = {
             url: url,
             type: this.requestMethod,
@@ -925,10 +940,11 @@ eb.comm.request.prototype = {
         };
 
         // Extend ajax settings with user provided settings.
-        $.extend(ajaxSettings, this.ajaxSettings | {});
+        $.extend(ajaxSettings, this.ajaxSettings || {});
         var ebc = this;
 
         // Do the remote call
+        this._log("Sending remote request...");
         $.ajax(ajaxSettings)
             .done(function (data, textStatus, jqXHR) {
                 ebc._log("Request done. Status: " + textStatus);
@@ -936,7 +952,9 @@ eb.comm.request.prototype = {
                 ebc._processAnswer(data, textStatus, jqXHR);
 
             }).fail(function (jqXHR, textStatus, errorThrown) {
-                ebc._log("Error: " + sprintf("Error: status=%d, responseText: %s, error: %s, status: %s", jqXHR.status, jqXHR.responseText, errorThrown, textStatus));
+                ebc._log("Error: " + sprintf("Error: status=[%d], responseText: [%s], error: [%s], status: [%s] misc: %s",
+                        jqXHR.status, jqXHR.responseText, errorThrown, textStatus, JSON.stringify(jqXHR)));
+
                 if (this._failCallback) {
                     this._failCallback(0x1, jqXHR, textStatus, errorThrown, ebc);
                 }
@@ -972,7 +990,7 @@ eb.comm.request.prototype = {
                 }
 
             } else {
-                this._log("Failure, status: " + this.responseParser.statusCode);
+                this._log("Failure, status: " + this.response.toString());
                 if (this._failCallback){
                     this._failCallback(0x2, jqXHR, textStatus, this.response, this);
                 }
@@ -992,9 +1010,8 @@ eb.comm.request.prototype = {
      * Note: Request has to be built when calling this function.
      *
      * @returns {*}
-     * @private
      */
-    _getApiUrl: function(){
+    getApiUrl: function(){
         if (this.requestMethod == "POST"){
             return sprintf("%s://%s:%d/%s/%s/%s/%s",
                 this.requestScheme,
@@ -1027,9 +1044,8 @@ eb.comm.request.prototype = {
      * Note: Request has to be built when calling this function.
      *
      * @returns {*}
-     * @private
      */
-    _getApiRequestData: function(){
+    getApiRequestData: function(){
         if (this.requestMethod == "POST") {
             return {data: this._requestBlock};
         } else {
@@ -1042,9 +1058,8 @@ eb.comm.request.prototype = {
      * For debugging & verification.
      *
      * @returns {string}
-     * @private
      */
-    _getSocketRequest: function(){
+    getSocketRequest: function(){
         this._socketRequest = {
             objectid:this._apiKeyReq,
             data:this._requestBlock,
