@@ -1,3 +1,4 @@
+"use strict";
 /**
  * EnigmaBridge API helper functions.
  * @author Dusan Klinec (ph4r05)
@@ -8,7 +9,7 @@
  * Base EB package.
  * @type {{name: string}}
  */
-eb = {
+var eb = {
     name: "EB",
     /** @namespace Exceptions. */
     exception: {
@@ -108,7 +109,7 @@ eb.padding.pkcs7 = {
             throw new sjcl.exception.corrupt("blocklength different than 16 is not implemented yet");
         }
 
-        w = sjcl.bitArray;
+        var w = sjcl.bitArray;
         var bl = w.bitLength(a);
         if (bl & 127 || !a.length) {
             throw new sjcl.exception.corrupt("input must be a positive multiple of the block size");
@@ -249,7 +250,7 @@ sjcl.mode.cbc = {
 eb.comm = {
     name: "comm",
     demangleNonce: function(nonce){
-        ba = sjcl.bitArray;
+        var ba = sjcl.bitArray;
         var bl = ba.bitLength(nonce);
         if ((bl&7) != 0){
             throw new sjcl.exception.invalid("nonce has to be aligned to bytes");
@@ -361,9 +362,9 @@ eb.comm.requestBuilder.prototype = {
         //
         // output = Packet0| _PLAINAES_ | <plain-data-length-4B> | <plaindata> | hexcode(result)
 
-        h = sjcl.codec.hex;
-        ba = sjcl.bitArray;
-        pad = eb.padding.pkcs7;
+        var h = sjcl.codec.hex;
+        var ba = sjcl.bitArray;
+        var pad = eb.padding.pkcs7;
 
         // Plain data is empty for now.
         var baPlain = plainData;
@@ -384,9 +385,9 @@ eb.comm.requestBuilder.prototype = {
         var aesKeyBits = h.toBits(this.aesKey);
         var macKeyBits = h.toBits(this.macKey);
 
-        aes = new sjcl.cipher.aes(aesKeyBits);
-        aesMac = new sjcl.cipher.aes(macKeyBits);
-        hmac = new sjcl.misc.hmac_cbc(aesMac, 16, eb.padding.empty);
+        var aes = new sjcl.cipher.aes(aesKeyBits);
+        var aesMac = new sjcl.cipher.aes(macKeyBits);
+        var hmac = new sjcl.misc.hmac_cbc(aesMac, 16, eb.padding.empty);
 
         // IV is null, nonce in the first block is kind of IV.
         var IV = h.toBits('00'.repeat(16));
@@ -490,7 +491,7 @@ eb.comm.response.prototype = {
      * Returns true if MAC verification is OK.
      */
     isMacOk: function(){
-        ba = sjcl.bitArray;
+        var ba = sjcl.bitArray;
         return this.mac
             && this.computedMac
             && ba.bitLength(this.mac) == 16*8
@@ -588,6 +589,11 @@ eb.comm.responseParser.prototype = {
             throw new sjcl.exception.invalid("response data invalid");
         }
 
+        // Shortcuts.
+        var h = sjcl.codec.hex;
+        var ba = sjcl.bitArray;
+        var pad = eb.padding.pkcs7;
+
         // Build new response message.
         var resp = this.response = new eb.comm.response();
         resp.statusCode = parseInt(data.status, 16);
@@ -606,15 +612,11 @@ eb.comm.responseParser.prototype = {
         var protectedBitsBl = ba.bitLength(protectedBits);
 
         // Decrypt and verify
-        h = sjcl.codec.hex;
-        ba = sjcl.bitArray;
-        pad = eb.padding.pkcs7;
-
         var aesKeyBits = h.toBits(this.aesKey);
         var macKeyBits = h.toBits(this.macKey);
-        aes = new sjcl.cipher.aes(aesKeyBits);
-        aesMac = new sjcl.cipher.aes(macKeyBits);
-        hmac = new sjcl.misc.hmac_cbc(aesMac, 16, eb.padding.empty);
+        var aes = new sjcl.cipher.aes(aesKeyBits);
+        var aesMac = new sjcl.cipher.aes(macKeyBits);
+        var hmac = new sjcl.misc.hmac_cbc(aesMac, 16, eb.padding.empty);
 
         // Verify MAC.
         var macTagOffset = protectedBitsBl - 16*8;
@@ -972,7 +974,7 @@ eb.comm.request.prototype = {
      */
     _processAnswer: function(data, textStatus, jqXHR){
         try {
-            h = sjcl.codec.hex;
+            var h = sjcl.codec.hex;
 
             // Build a new EB request.
             this.responseParser = new eb.comm.responseParser();
@@ -997,7 +999,7 @@ eb.comm.request.prototype = {
             }
 
         } catch(e){
-            this._log("Excetion when processing the response: " + e);
+            this._log("Exception when processing the response: " + e);
             if (this._failCallback){
                 this._failCallback(0x3, jqXHR, textStatus, e, this);
             }
