@@ -6,6 +6,30 @@
  */
 
 /**
+ * Monkey-patching for prototype inheritance.
+ *
+ * @param parentClassOrObject
+ * @returns {Function}
+ */
+Function.prototype.inheritsFrom = function( parentClassOrObject ){
+    if ( parentClassOrObject.constructor == Function )
+    {
+        //Normal Inheritance
+        this.prototype = new parentClassOrObject;
+        this.prototype.constructor = this;
+        this.prototype.parent = parentClassOrObject.prototype;
+    }
+    else
+    {
+        //Pure Virtual Inheritance
+        this.prototype = parentClassOrObject;
+        this.prototype.constructor = this;
+        this.prototype.parent = parentClassOrObject;
+    }
+    return this;
+};
+
+/**
  * Base EB package.
  * @type {{name: string}}
  */
@@ -282,15 +306,14 @@ eb.comm = {
  * @param userObjectId
  * @param reqType
  */
-eb.comm.requestBuilder = function(nonce, aesKey, macKey, userObjectId, reqType){
+eb.comm.processDataRequestBodyBuilder = function(nonce, aesKey, macKey, userObjectId, reqType){
     this.userObjectId = userObjectId || -1;
     this.nonce = nonce || "";
     this.aesKey = aesKey || "";
     this.macKey = macKey || "";
     this.reqType = reqType || "PLAINAES";
 };
-
-eb.comm.requestBuilder.prototype = {
+eb.comm.processDataRequestBodyBuilder.prototype = {
     /**
      * User object ID, integer type.
      * @input
@@ -432,7 +455,6 @@ eb.comm.requestBuilder.prototype = {
 eb.comm.response = function(){
 
 };
-
 eb.comm.response.prototype = {
     /**
      * Parsed status code. 0x9000 = OK.
@@ -446,6 +468,46 @@ eb.comm.response.prototype = {
      */
     statusDetail: "",
 
+    /**
+     * Function name extracted from the request.
+     */
+    function: "",
+
+    /**
+     * Raw result of the call.
+     * Usually processed by child classes.
+     */
+    result: "",
+
+    /**
+     * Returns true if after parsing, code is OK.
+     * @returns {boolean}
+     */
+    isCodeOk: function(){
+        return this.statusCode == 0x9000;
+    },
+
+    toString: function(){
+        return sprintf("Response{statusCode=%4X, statusDetail=[%s], userObjectId: %08X, function: [%s], result: [%s]",
+            this.statusCode,
+            this.statusDetail,
+            this.userObjectID,
+            this.function,
+            this.result
+        );
+    }
+};
+
+/**
+ * Process data response.
+ * Parsed from processData EB response.
+ * @extends eb.comm.response
+ */
+eb.comm.processDataResponse = function(){
+
+};
+eb.comm.processDataResponse.inheritsFrom(eb.comm.response);
+eb.comm.processDataResponse.prototype = $.extend(eb.comm.processDataResponse.prototype, {
     /**
      * Plain data parsed from the response.
      * Nor MACed neither encrypted.
@@ -472,11 +534,6 @@ eb.comm.response.prototype = {
     nonce: "",
 
     /**
-     * Function name extracted from the request.
-     */
-    function: "",
-
-    /**
      * MAC value parsed from the message.
      * If macOk is true, it is same as computed MAC.
      */
@@ -499,16 +556,8 @@ eb.comm.response.prototype = {
             && ba.equal(this.mac, this.computedMac);
     },
 
-    /**
-     * Returns true if after parsing, code is OK.
-     * @returns {boolean}
-     */
-    isCodeOk: function(){
-        return this.statusCode == 0x9000;
-    },
-
     toString: function(){
-        return sprintf("Response{statusCode=%4X, statusDetail=[%s], userObjectId: %08X, function: [%s], " +
+        return sprintf("ProcessDataResponse{statusCode=%4X, statusDetail=[%s], userObjectId: %08X, function: [%s], " +
             "nonce: [%s], protectedData: [%s], plainData: [%s], mac: [%s], computedMac: [%s], macOK: %d",
             this.statusCode,
             this.statusDetail,
@@ -522,37 +571,15 @@ eb.comm.response.prototype = {
             this.isMacOk()
         );
     }
-};
+});
 
 /**
  * Raw EB Response parser.
- * @param aesKey
- * @param macKey
  */
-eb.comm.responseParser = function(aesKey, macKey){
-    this.aesKey = aesKey || "";
-    this.macKey = macKey || "";
+eb.comm.responseParser = function(){
+
 };
-
 eb.comm.responseParser.prototype = {
-    /**
-     * Parsed user object ID, integer type.
-     * @input
-     */
-    userObjectId : -1,
-
-    /**
-     * AES communication encryption key, hexcoded string.
-     * @input
-     */
-    aesKey: "",
-
-    /**
-     * AES MAC communication key, hexcoded string.
-     * @input
-     */
-    macKey: "",
-
     /**
      * Parsed response
      */
@@ -579,32 +606,110 @@ eb.comm.responseParser.prototype = {
     },
 
     /**
+     * Parses common JSON headers from the response, e.g., status, to the provided message.
+     * @param resp
+     * @param data
+     * @returns {eb.comm.response}
+     */
+    parseCommonHeaders: function(resp, data){
+        if (!data || !data.status || !data.function){
+            throw new sjcl.exception.invalid("response data invalid");
+        }
+
+        // Build new response message.
+        resp.statusCode = parseInt(data.status, 16);
+        resp.statusDetail = data.statusdetail || "";
+        resp.function = data.function;
+        resp.result = data.result;
+        return resp;
+    },
+
+    /**
      * Parse EB response
      *
      * @param data - json response
      * @returns request unwrapped response.
      */
     parse: function(data){
-        if (!data || !data.status || !data.function){
-            throw new sjcl.exception.invalid("response data invalid");
-        }
-
-        // Shortcuts.
-        var h = sjcl.codec.hex;
-        var ba = sjcl.bitArray;
-        var pad = eb.padding.pkcs7;
+        var resp = this.response = new eb.comm.response();
+        this.parseCommonHeaders(resp, data);
 
         // Build new response message.
-        var resp = this.response = new eb.comm.response();
-        resp.statusCode = parseInt(data.status, 16);
-        resp.statusDetail = data.statusdetail || "";
-        resp.function = data.function;
+        if (!this.success()){
+            this._log("Error in processing, status: " + data.status + ", message: " + resp.statusDetail);
+        }
+
+        return resp;
+    },
+
+    _log:  function(x) {
+        if (!this.debuggingLog){
+            return;
+        }
+
+        if (console && console.log){
+            console.log(x);
+        }
+
+        if (this.logger){
+            this.logger(x);
+        }
+    }
+};
+
+/**
+ * Parser parsing namely ProcessData response.
+ * Data returned is encoded in the particular form, encrypted and MACed.
+ * This response parser unwraps protected response.
+ *
+ * @param aesKey
+ * @param macKey
+ * @extends eb.comm.responseParser
+ */
+eb.comm.processDataResponseParser = function(aesKey, macKey){
+    this.aesKey = aesKey || "";
+    this.macKey = macKey || "";
+};
+eb.comm.processDataResponseParser.inheritsFrom(eb.comm.responseParser);
+eb.comm.processDataResponseParser.prototype = $.extend(eb.comm.processDataResponseParser.prototype, {
+    /**
+     * Parsed user object ID, integer type.
+     * @input
+     */
+    userObjectId : -1,
+
+    /**
+     * AES communication encryption key, hexcoded string.
+     * @input
+     */
+    aesKey: "",
+
+    /**
+     * AES MAC communication key, hexcoded string.
+     * @input
+     */
+    macKey: "",
+
+    /**
+     * Parse EB response
+     *
+     * @param data - json response
+     * @returns request unwrapped response.
+     */
+    parse: function(data){
+        var resp = this.response = new eb.comm.processDataResponse();
+        this.parseCommonHeaders(resp, data);
         if (!this.success()){
             this._log("Error in processing, status: " + data.status + ", message: " + resp.statusDetail);
             return resp;
         }
 
-        var resultBuffer = data.result;
+        // Shortcuts.
+        var h = sjcl.codec.hex;
+        var ba = sjcl.bitArray;
+
+        // Build new response message.
+        var resultBuffer = resp.result;
         var baResult = h.toBits(resultBuffer.substring(0, resultBuffer.indexOf("_")));
         var plainLen = ba.extract(baResult, 0, 2*8);
         var plainBits = ba.bitSlice(baResult, 2*8, 2*8+plainLen*8);
@@ -665,56 +770,17 @@ eb.comm.responseParser.prototype = {
         this._log("responseData: " + h.fromBits(resp.protectedData));
 
         return resp;
-    },
-
-    _log:  function(x) {
-        if (!this.debuggingLog){
-            return;
-        }
-
-        if (console && console.log){
-            console.log(x);
-        }
-
-        if (this.logger){
-            this.logger(x);
-        }
     }
-};
+});
 
 /**
- * EB request builder.
- * @param apiKey
- * @param aesKey
- * @param macKey
- * @param userObjectId
+ * Simple connector to the EB interface.
+ * Configurable for https/http GET/POST
  */
-eb.comm.request = function(apiKey, aesKey, macKey, userObjectId){
-    this.apiKey = apiKey || "";
-    this.aesKey = aesKey || "";
-    this.macKey = macKey || "";
-    this.userObjectId = userObjectId || -1;
+eb.comm.connector = function(){
+
 };
-
-eb.comm.request.prototype = {
-    /**
-     * User object ID to perform operation with, integer type.
-     * @input
-     */
-    userObjectId : -1,
-
-    /**
-     * AES communication encryption key, hexcoded string.
-     * @input
-     */
-    aesKey: "",
-
-    /**
-     * AES MAC communication key, hexcoded string.
-     * @input
-     */
-    macKey: "",
-
+eb.comm.connector.prototype = {
     /**
      * Function to call
      * @input
@@ -723,23 +789,11 @@ eb.comm.request.prototype = {
     callFunction: "ProcessData",
 
     /**
-     * Type of the data request.
+     * Version of EB API.
      * @input
-     * @default PLAINAES
+     * @default 1.0
      */
-    callRequestType: "PLAINAES",
-
-    /**
-     * User API key
-     * @input
-     */
-    apiKey: "",
-
-    /**
-     * Response object produced by response parser
-     * @output
-     */
-    response: null,
+    apiVersion: "1.0",
 
     /**
      * Method to do REST request with. GET or POST are allowed.
@@ -793,29 +847,33 @@ eb.comm.request.prototype = {
     logger: null,
 
     /**
-     * Request builder used to build the request.
-     * @output
-     */
-    requestBuilder: null,
-
-    /**
-     * Response parser parsing raw EB response.
-     * @output
-     */
-    responseParser: null,
-
-    /**
      * Request start time. Measure how long it took.
      * @output
      */
     requestTime: 0,
 
     /**
-     * Composite API key for the request.
-     * Generated before request is sent.
-     * @private
+     * Raw request generated by the build call.
+     * e.g., transmitted in the GET query method parameters / URL.
      */
-    _apiKeyReq: "",
+    reqHeader: undefined,
+
+    /**
+     * Body part of the request.
+     * e.g., transmitted in body of the HTTP message.
+     */
+    reqBody: undefined,
+
+    /**
+     * Response generated by response array.
+     */
+    response: undefined,
+
+    /**
+     * Response parser used to parse the response.
+     * If not defined before calling doRequest method, default response parser is created.
+     */
+    responseParser: undefined,
 
     /**
      * Socket equivalent request, for debugging.
@@ -823,18 +881,6 @@ eb.comm.request.prototype = {
      * @private
      */
     _socketRequest: "",
-
-    /**
-     * Request block generated by request builder.
-     * @private
-     */
-    _requestBlock: "",
-
-    /**
-     * Version of EB API.
-     * @private
-     */
-    _apiVersion: "1.0",
 
     _doneCallback: function(response, requestObj, jqXHR){},
     _failCallback: function(failType, jqXHR, textStatus, errorThrown, requestObj){},
@@ -856,32 +902,6 @@ eb.comm.request.prototype = {
     },
 
     /**
-     * Returns nonce from the request builder. If set.
-     * @returns {*}
-     */
-    getNonce: function(){
-        if (this.requestBuilder == null){
-            return null;
-        }
-
-        return this.requestBuilder.nonce;
-    },
-
-    /**
-     * Generates new nonce to the request builder.
-     * If request builder is null, new is constructed.
-     * @returns {string|*|string}
-     */
-    genNonce: function(){
-        if (this.requestBuilder == null){
-            this.requestBuilder = new eb.comm.requestBuilder();
-        }
-
-        this.requestBuilder.nonce = eb.misc.genHexNonce(16);
-        return this.requestBuilder.nonce;
-    },
-
-    /**
      * Returns if the EB returned with success.
      * Note: Data still may have invalid MAC.
      * @returns {*|boolean}
@@ -898,19 +918,6 @@ eb.comm.request.prototype = {
         if (!configObject){
             this._log("Invalid config object");
             return;
-        }
-
-        if ("aesKey" in configObject){
-            this.aesKey = configObject.aesKey;
-        }
-        if ("macKey" in configObject){
-            this.macKey = configObject.macKey;
-        }
-        if ("apiKey" in configObject){
-            this.apiKey = configObject.apiKey;
-        }
-        if ("userObjectId" in configObject){
-            this.userObjectId = configObject.userObjectId;
         }
 
         // Advanced connection settings.
@@ -932,58 +939,43 @@ eb.comm.request.prototype = {
         if ("callFunction" in configObject){
             this.callFunction = configObject.callFunction;
         }
-        if ("callRequestType" in configObject){
-            this.callRequestType = configObject.callRequestType;
-        }
         if ("debuggingLog" in configObject){
             this.debuggingLog = configObject.debuggingLog;
         }
         if ("logger" in configObject){
             this.logger = configObject.logger;
         }
+        if ("responseParser" in configObject){
+            this.responseParser = configObject.responseParser;
+        }
+        if ("reqHeader" in configObject){
+            this.reqHeader = configObject.reqHeader;
+        }
+        if ("reqBody" in configObject){
+            this.reqBody = configObject.reqBody;
+        }
     },
 
     /**
      * Initializes state and builds request
-     * @param plainData
-     * @param requestData
+     * @param requestHeader
+     * @param requestBody
      */
-    build: function(plainData, requestData){
-        this._log("Building request body");
-        this._apiKeyReq = sprintf("%s%010x", this.apiKey, this.userObjectId);
-
-        // Build a new EB request.
-        this.requestBuilder = new eb.comm.requestBuilder();
-        this.requestBuilder.aesKey = this.aesKey;
-        this.requestBuilder.macKey = this.macKey;
-        this.requestBuilder.userObjectId = this.userObjectId;
-        this.requestBuilder.reqType = this.callRequestType;
-        this.requestBuilder.debuggingLog = this.debuggingLog;
-        this.requestBuilder.logger = this.logger;
-        this.requestBuilder.genNonce();
-
-        this._requestBlock = this.requestBuilder.build(plainData, requestData);
-        var nonce = this.requestBuilder.nonce;
-        this._log("Nonce generated: " + nonce);
-
-        var url = this.getApiUrl();
-        var apiData = this.getApiRequestData();
-
-        this._log("URL: " + url + ", method: " + this.requestMethod);
-        this._log("UserData: " + JSON.stringify(apiData));
-        this._log("SocketReq: " + JSON.stringify(this.getSocketRequest()));
+    build: function(requestHeader, requestBody){
+        this.reqHeader = requestHeader;
+        this.reqBody = requestBody;
     },
 
     /**
      * Builds EB request.
      *
-     * @param plainData - bitArray of the plaintext data (will be MAC protected).
-     * @param requestData - bitArray with userdata to perform operation on (will be encrypted, MAC protected)
+     * @param requestHeader
+     * @param requestBody
      * @returns request body string.
      */
-    call: function(plainData, requestData){
-        if (!this._apiKeyReq){
-            this.build(plainData, requestData);
+    doRequest: function(requestHeader, requestBody){
+        if (!this.reqBody){
+            this.build(requestHeader, requestBody);
         }
 
         var url = this.getApiUrl();
@@ -1008,22 +1000,24 @@ eb.comm.request.prototype = {
                 ebc._requestFinished();
                 ebc._log("Response status: " + textStatus);
                 ebc._log("Raw response: " + JSON.stringify(data));
-                ebc._processAnswer(data, textStatus, jqXHR);
+                ebc.processAnswer(data, textStatus, jqXHR);
 
             }).fail(function (jqXHR, textStatus, errorThrown) {
-                ebc._requestFinished();
-                ebc._log("Error: " + sprintf("Error: status=[%d], responseText: [%s], error: [%s], status: [%s] misc: %s",
-                        jqXHR.status, jqXHR.responseText, errorThrown, textStatus, JSON.stringify(jqXHR)));
+            ebc._requestFinished();
+            ebc._log("Error: " + sprintf("Error: status=[%d], responseText: [%s], error: [%s], status: [%s] misc: %s",
+                    jqXHR.status, jqXHR.responseText, errorThrown, textStatus, JSON.stringify(jqXHR)));
 
-                if (this._failCallback) {
-                    this._failCallback(0x1, jqXHR, textStatus, errorThrown, ebc);
-                }
+            ebc.processFail(jqXHR, textStatus, errorThrown);
+            if (this._failCallback) {
+                this._failCallback(0x1, jqXHR, textStatus, errorThrown, ebc);
+            }
 
-            }).always(function (data, textStatus, jqXHR) {
-                if (this._alwaysCallback) {
-                    this._alwaysCallback(ebc);
-                }
-            });
+        }).always(function (data, textStatus, jqXHR) {
+            ebc.processAlways(data, textStatus, jqXHR);
+            if (this._alwaysCallback) {
+                this._alwaysCallback(ebc);
+            }
+        });
     },
 
     /**
@@ -1037,23 +1031,21 @@ eb.comm.request.prototype = {
 
     /**
      * Processing response from the server.
-     * @private
+     *
+     * @param data
+     * @param textStatus
+     * @param jqXHR
      */
-    _processAnswer: function(data, textStatus, jqXHR){
+    processAnswer: function(data, textStatus, jqXHR){
         try {
             var h = sjcl.codec.hex;
 
             // Build a new EB request.
-            this.responseParser = new eb.comm.responseParser();
-            this.responseParser.aesKey = this.aesKey;
-            this.responseParser.macKey = this.macKey;
-            this.responseParser.debuggingLog = true;
-            this.responseParser.logger = this.logger;
+            var responseParser = this.getResponseParser();
+            this.response = responseParser.parse(data);
 
-            this.response = this.responseParser.parse(data);
-            if (this.responseParser.success()) {
+            if (responseParser.success()) {
                 this._log("Processing complete, response: " + this.response.toString());
-                // TODO: check nonce match & function match & userObjectId match.
                 if (this._doneCallback){
                     this._doneCallback(this.response, this, jqXHR)
                 }
@@ -1074,6 +1066,26 @@ eb.comm.request.prototype = {
     },
 
     /**
+     * To be overriden.
+     * @param jqXHR
+     * @param textStatus
+     * @param errorThrown
+     */
+    processFail: function(jqXHR, textStatus, errorThrown){
+
+    },
+
+    /**
+     * To be overriden.
+     * @param data
+     * @param textStatus
+     * @param jqXHR
+     */
+    processAlways: function(data, textStatus, jqXHR){
+
+    },
+
+    /**
      * Returns remote API URL to query with Ajax.
      * According to current request settings.
      * Note: Request has to be built when calling this function.
@@ -1081,30 +1093,10 @@ eb.comm.request.prototype = {
      * @returns {*}
      */
     getApiUrl: function(){
-        if (this.requestMethod == "POST"){
-            return sprintf("%s://%s:%d/%s/%s/%s/%s",
-                this.requestScheme,
-                this.remoteEndpoint,
-                this.remotePort,
-                this._apiKeyReq,
-                this._apiVersion,
-                this.callFunction,
-                this.getNonce());
-
-        } else if (this.requestMethod == "GET"){
-            return sprintf("%s://%s:%d/%s/%s/%s/%s/%s",
-                this.requestScheme,
-                this.remoteEndpoint,
-                this.remotePort,
-                this._apiKeyReq,
-                this._apiVersion,
-                this.callFunction,
-                this.getNonce(),
-                this._requestBlock);
-
-        } else {
-            throw new eb.exception.invalid("Invalid configuration, unknown method: " + this.requestMethod);
-        }
+        return sprintf("%s://%s:%d/%s/%s/%s/%s",
+            this.requestScheme,
+            this.remoteEndpoint,
+            this.remotePort);
     },
 
     /**
@@ -1115,11 +1107,20 @@ eb.comm.request.prototype = {
      * @returns {*}
      */
     getApiRequestData: function(){
-        if (this.requestMethod == "POST") {
-            return {data: this._requestBlock};
-        } else {
-            return {};
-        }
+        return this.reqBody;
+    },
+
+    /**
+     * Returns response parser when is needed. May lazyly initialize parser.
+     * Override point.
+     *
+     * @returns {*}
+     */
+    getResponseParser: function(){
+        this.responseParser = new eb.comm.responseParser();
+        this.responseParser.debuggingLog = true;
+        this.responseParser.logger = this.logger;
+        return this.responseParser;
     },
 
     /**
@@ -1130,11 +1131,12 @@ eb.comm.request.prototype = {
      */
     getSocketRequest: function(){
         this._socketRequest = {
-            objectid:this._apiKeyReq,
-            data:this._requestBlock,
-            function:this.callFunction,
-            nonce:this.getNonce(),
-            version:this._apiVersion};
+            version:this.apiVersion,
+            function:this.callFunction
+        };
+
+        $.extend(this._socketRequest, this.reqHeader || {});
+        $.extend(this._socketRequest, this.reqBody || {});
         return this._socketRequest;
     },
 
@@ -1157,3 +1159,242 @@ eb.comm.request.prototype = {
         }
     }
 };
+
+/**
+ * Process data request to the EB.
+ * @param apiKey
+ * @param aesKey
+ * @param macKey
+ * @param userObjectId
+ */
+eb.comm.processData = function(apiKey, aesKey, macKey, userObjectId){
+    this.apiKey = apiKey || "";
+    this.aesKey = aesKey || "";
+    this.macKey = macKey || "";
+    this.userObjectId = userObjectId || -1;
+    this.callFunction = "ProcessData";
+};
+eb.comm.processData.inheritsFrom(eb.comm.connector);
+eb.comm.processData.prototype = $.extend(eb.comm.processData.prototype, {
+    /**
+     * User object ID to perform operation with, integer type.
+     * @input
+     */
+    userObjectId : -1,
+
+    /**
+     * AES communication encryption key, hexcoded string.
+     * @input
+     */
+    aesKey: "",
+
+    /**
+     * AES MAC communication key, hexcoded string.
+     * @input
+     */
+    macKey: "",
+
+    /**
+     * Type of the data request.
+     * @input
+     * @default PLAINAES
+     */
+    callRequestType: "PLAINAES",
+
+    /**
+     * User API key
+     * @input
+     */
+    apiKey: "",
+
+    /**
+     * Request builder used to build the request.
+     * @output
+     */
+    processDataRequestBodyBuilder: null,
+
+    /**
+     * Composite API key for the request.
+     * Generated before request is sent.
+     * @private
+     */
+    _apiKeyReq: "",
+
+    /**
+     * Request block generated by request builder.
+     * @private
+     */
+    _requestBlock: "",
+
+    /**
+     * Returns nonce from the request builder. If set.
+     * @returns {*}
+     */
+    getNonce: function(){
+        if (this.processDataRequestBodyBuilder == null){
+            return null;
+        }
+
+        return this.processDataRequestBodyBuilder.nonce;
+    },
+
+    /**
+     * Generates new nonce to the request builder.
+     * If request builder is null, new is constructed.
+     * @returns {string|*|string}
+     */
+    genNonce: function(){
+        if (this.processDataRequestBodyBuilder == null){
+            this.processDataRequestBodyBuilder = new eb.comm.processDataRequestBodyBuilder();
+        }
+
+        this.processDataRequestBodyBuilder.nonce = eb.misc.genHexNonce(16);
+        return this.processDataRequestBodyBuilder.nonce;
+    },
+
+    /**
+     * Process configuration from the config object.
+     * @param configObject java object with the configuration.
+     */
+    configure: function(configObject){
+        if (!configObject){
+            this._log("Invalid config object");
+            return;
+        }
+
+        // Configure with parent.
+        this.parent.configure.call(this, configObject);
+
+        // Configure this.
+        if ("aesKey" in configObject){
+            this.aesKey = configObject.aesKey;
+        }
+        if ("macKey" in configObject){
+            this.macKey = configObject.macKey;
+        }
+        if ("apiKey" in configObject){
+            this.apiKey = configObject.apiKey;
+        }
+        if ("userObjectId" in configObject){
+            this.userObjectId = configObject.userObjectId;
+        }
+    },
+
+    /**
+     * Initializes state and builds request
+     * @param plainData
+     * @param requestData
+     */
+    build: function(plainData, requestData){
+        this._log("Building request body");
+        this._apiKeyReq = sprintf("%s%010x", this.apiKey, this.userObjectId);
+
+        // Build a new EB request.
+        this.processDataRequestBodyBuilder = new eb.comm.processDataRequestBodyBuilder();
+        this.processDataRequestBodyBuilder.aesKey = this.aesKey;
+        this.processDataRequestBodyBuilder.macKey = this.macKey;
+        this.processDataRequestBodyBuilder.userObjectId = this.userObjectId;
+        this.processDataRequestBodyBuilder.reqType = this.callRequestType;
+        this.processDataRequestBodyBuilder.debuggingLog = this.debuggingLog;
+        this.processDataRequestBodyBuilder.logger = this.logger;
+        this.processDataRequestBodyBuilder.genNonce();
+
+        this._requestBlock = this.processDataRequestBodyBuilder.build(plainData, requestData);
+        this.reqBody = {data : this._requestBlock};
+        this.reqHeader = {
+            objectid:this._apiKeyReq,
+            function:this.callFunction,
+            nonce:this.getNonce(),
+            version:this.apiVersion
+        };
+
+        var nonce = this.processDataRequestBodyBuilder.nonce;
+        var url = this.getApiUrl();
+        var apiData = this.getApiRequestData();
+
+        this._log("Nonce generated: " + nonce);
+        this._log("URL: " + url + ", method: " + this.requestMethod);
+        this._log("UserData: " + JSON.stringify(apiData));
+        this._log("SocketReq: " + JSON.stringify(this.getSocketRequest()));
+    },
+
+    /**
+     * Builds EB request.
+     *
+     * @param requestHeader
+     * @param requestBody
+     * @returns request body string.
+     */
+    doRequest: function(requestHeader, requestBody){
+        if (!this.reqBody){
+            this.build(requestHeader, requestBody);
+        }
+
+        this.parent.doRequest.call(this);
+    },
+
+    /**
+     * Returns remote API URL to query with Ajax.
+     * According to current request settings.
+     * Note: Request has to be built when calling this function.
+     *
+     * @returns {*}
+     */
+    getApiUrl: function(){
+        if (this.requestMethod == "POST"){
+            return sprintf("%s://%s:%d/%s/%s/%s/%s",
+                this.requestScheme,
+                this.remoteEndpoint,
+                this.remotePort,
+                this._apiKeyReq,
+                this.apiVersion,
+                this.callFunction,
+                this.getNonce());
+
+        } else if (this.requestMethod == "GET"){
+            return sprintf("%s://%s:%d/%s/%s/%s/%s/%s",
+                this.requestScheme,
+                this.remoteEndpoint,
+                this.remotePort,
+                this._apiKeyReq,
+                this.apiVersion,
+                this.callFunction,
+                this.getNonce(),
+                this._requestBlock);
+
+        } else {
+            throw new eb.exception.invalid("Invalid configuration, unknown method: " + this.requestMethod);
+        }
+    },
+
+    /**
+     * Returns Ajax request data.
+     * According to current request settings.
+     * Note: Request has to be built when calling this function.
+     *
+     * @returns {*}
+     */
+    getApiRequestData: function(){
+        if (this.requestMethod == "POST") {
+            return this.reqBody;
+        } else {
+            return {};
+        }
+    },
+
+    /**
+     * Returns response parser when is needed. May lazyly initialize parser.
+     * Override point.
+     *
+     * @returns {*}
+     */
+    getResponseParser: function(){
+        this.responseParser = new eb.comm.processDataResponseParser();
+        this.responseParser.debuggingLog = true;
+        this.responseParser.logger = this.logger;
+        this.responseParser.aesKey = this.aesKey;
+        this.responseParser.macKey = this.macKey;
+        return this.responseParser;
+    }
+});
+

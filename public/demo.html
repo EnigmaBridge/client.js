@@ -188,7 +188,7 @@
             debuggingLog: true
         };
 
-        var request = new eb.comm.request();
+        var request = new eb.comm.processData();
         request.configure(userConfig);
         request.configure(endpointConfig);
 
@@ -214,7 +214,7 @@
                 JSON.stringify(request.getSocketRequest())));
 
         // Do the call.
-        request.call();
+        request.doRequest();
     }
 
     $(function(){
