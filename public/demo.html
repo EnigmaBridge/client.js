@@ -170,23 +170,29 @@
             append_message(msg);
         };
 
-        var request = new eb.comm.request();
-        request.aesKey = aesKey;
-        request.macKey = macKey;
-        request.apiKey = apiKey;
-        request.userObjectId = keyId;
+        var userConfig = {
+            aesKey: aesKey,
+            macKey: macKey,
+            apiKey: apiKey,
+            userObjectId : keyId
+        };
 
-        // Advanced settings.
-        request.remoteEndpoint = endpoint;
-        request.remotePort = 11180;
-        request.requestMethod = method;
-        request.requestScheme = scheme;
-        request.requestTimeout = 7000;
-        request.callFunction = "ProcessData";
-        request.callRequestType = "PLAINAES";
+        var endpointConfig = {
+            remoteEndpoint: endpoint,
+            remotePort: 11180,
+            requestMethod: method,
+            requestScheme: scheme,
+            requestTimeout: 7000,
+            callFunction: "ProcessData",
+            callRequestType: "PLAINAES",
+            debuggingLog: true
+        };
+
+        var request = new eb.comm.request();
+        request.configure(userConfig);
+        request.configure(endpointConfig);
 
         // Logging settings.
-        request.debuggingLog = true;
         request.logger = logger;
 
         // Callbacks settings.

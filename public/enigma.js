@@ -891,6 +891,59 @@ eb.comm.request.prototype = {
     },
 
     /**
+     * Process configuration from the config object.
+     * @param configObject java object with the configuration.
+     */
+    configure: function(configObject){
+        if (!configObject){
+            this._log("Invalid config object");
+            return;
+        }
+
+        if ("aesKey" in configObject){
+            this.aesKey = configObject.aesKey;
+        }
+        if ("macKey" in configObject){
+            this.macKey = configObject.macKey;
+        }
+        if ("apiKey" in configObject){
+            this.apiKey = configObject.apiKey;
+        }
+        if ("userObjectId" in configObject){
+            this.userObjectId = configObject.userObjectId;
+        }
+
+        // Advanced connection settings.
+        if ("remoteEndpoint" in configObject){
+            this.remoteEndpoint = configObject.remoteEndpoint;
+        }
+        if ("remotePort" in configObject){
+            this.remotePort = configObject.remotePort;
+        }
+        if ("requestMethod" in configObject){
+            this.requestMethod = configObject.requestMethod;
+        }
+        if ("requestScheme" in configObject){
+            this.requestScheme = configObject.requestScheme;
+        }
+        if ("requestTimeout" in configObject){
+            this.requestTimeout = configObject.requestTimeout;
+        }
+        if ("callFunction" in configObject){
+            this.callFunction = configObject.callFunction;
+        }
+        if ("callRequestType" in configObject){
+            this.callRequestType = configObject.callRequestType;
+        }
+        if ("debuggingLog" in configObject){
+            this.debuggingLog = configObject.debuggingLog;
+        }
+        if ("logger" in configObject){
+            this.logger = configObject.logger;
+        }
+    },
+
+    /**
      * Initializes state and builds request
      * @param plainData
      * @param requestData
