@@ -1496,8 +1496,8 @@ eb.comm.processData.prototype = $.extend(eb.comm.processData.prototype, {
                 this.requestScheme,
                 this.remoteEndpoint,
                 this.remotePort,
-                this._apiKeyReq,
                 this.apiVersion,
+                this._apiKeyReq,
                 this.callFunction,
                 this.getNonce());
 
@@ -1506,8 +1506,8 @@ eb.comm.processData.prototype = $.extend(eb.comm.processData.prototype, {
                 this.requestScheme,
                 this.remoteEndpoint,
                 this.remotePort,
-                this._apiKeyReq,
                 this.apiVersion,
+                this._apiKeyReq,
                 this.callFunction,
                 this.getNonce(),
                 this._requestBlock);
