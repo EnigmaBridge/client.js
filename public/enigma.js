@@ -1210,6 +1210,8 @@ eb.comm.connector.prototype = {
             if (this._failCallback){
                 this._failCallback(0x3, jqXHR, textStatus, e, this);
             }
+
+            throw e;
         }
     },
 
