@@ -1156,14 +1156,14 @@ eb.comm.connector.prototype = {
                     jqXHR.status, jqXHR.responseText, errorThrown, textStatus, JSON.stringify(jqXHR)));
 
             ebc.processFail(jqXHR, textStatus, errorThrown);
-            if (this._failCallback) {
-                this._failCallback(0x1, jqXHR, textStatus, errorThrown, ebc);
+            if (ebc._failCallback) {
+                ebc._failCallback(0x1, jqXHR, textStatus, errorThrown, ebc);
             }
 
         }).always(function (data, textStatus, jqXHR) {
             ebc.processAlways(data, textStatus, jqXHR);
-            if (this._alwaysCallback) {
-                this._alwaysCallback(ebc);
+            if (ebc._alwaysCallback) {
+                ebc._alwaysCallback(ebc);
             }
         });
     },
