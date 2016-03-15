@@ -210,7 +210,9 @@
 
     function fileRequest(userConfig, endpointConfig, logger, plainData, requestData, parallel_){
         if (!parallel_ && reqCtr > maxCtr){
-            log("I am done..." + reqTimes);
+            var sum = reqTimes.reduce(function(a, b) { return a + b; });
+            var avg = sum / reqTimes.length;
+            log("I am done..." + reqTimes + "; avg=" + avg);
             return;
         }
 
