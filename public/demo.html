@@ -61,7 +61,9 @@
 
             <label>User object ID
                 <input type="text" name="userObjectID" id="userObjectID" value="EE01"/>
-                <span>Hexcoded user object ID stored in EB you want to work with</span>
+                <span>Hexcoded user object ID stored in EB you want to work with.
+                    RSA decrypt: <a onclick="$('#userObjectID').val('EE03');">0xEE03</a>,
+                    AES encrypt: <a onclick="$('#userObjectID').val('EE01');">0xEE01</a></span>
             </label>
 
             <label>Endpoint
