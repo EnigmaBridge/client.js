@@ -9,15 +9,25 @@
  * Monkey-patching for prototype inheritance.
  *
  * @param parentClassOrObject
+ * @param newPrototype
  * @returns {Function}
  */
-Function.prototype.inheritsFrom = function( parentClassOrObject ){
+Function.prototype.inheritsFrom = function( parentClassOrObject, newPrototype ){
     if ( parentClassOrObject.constructor == Function )
     {
         //Normal Inheritance
         this.prototype = new parentClassOrObject;
         this.prototype.constructor = this;
         this.prototype.parent = parentClassOrObject.prototype;
+
+        // Better for calling super methods. Avoids looping.
+        this.superclass = parentClassOrObject.prototype;
+        this.prototype = $.extend(this.prototype, newPrototype);
+
+        // If we have inheritance chain A->B->C, A = root, A defines method x()
+        // B also defines x = function() { this.parent.x.call(this); }, C does not defines x,
+        // then calling x on C will cause infinite loop because this references to C in B.x() and this.parent is B in B.x()
+        // not A as desired.
     }
     else
     {
@@ -25,6 +35,7 @@ Function.prototype.inheritsFrom = function( parentClassOrObject ){
         this.prototype = parentClassOrObject;
         this.prototype.constructor = this;
         this.prototype.parent = parentClassOrObject;
+        this.superclass = parentClassOrObject;
     }
     return this;
 };
@@ -79,6 +90,14 @@ eb.misc = {
     },
     xor: function(x,y){
         return [x[0]^y[0],x[1]^y[1],x[2]^y[2],x[3]^y[3]];
+    },
+    absorb: function(dst, src){
+        for(var key in src) {
+            if (src.hasOwnProperty(key)) {
+                dst[key] = src[key];
+            }
+        }
+        return dst;
     }
 };
 
@@ -551,7 +570,7 @@ eb.comm.processDataRequestBodyBuilder.prototype = {
         baBuff = ba.concat(baBuff, requestData);
         // Add padding.
         baBuff = pad.pad(baBuff);
-        this._log("baBuff: " + h.fromBits(baBuff) + "; len: " + ba.bitLength(baBuff));
+        this._log("ProcessData input: " + h.fromBits(baBuff) + "; len: " + ba.bitLength(baBuff));
 
         var aesKeyBits = h.toBits(this.aesKey);
         var macKeyBits = h.toBits(this.macKey);
@@ -636,12 +655,12 @@ eb.comm.response.prototype = {
     },
 
     toString: function(){
-        return sprintf("Response{statusCode=%4X, statusDetail=[%s], userObjectId: %08X, function: [%s], result: [%s]",
+        return sprintf("Response{statusCode=0x%4X, statusDetail=[%s], userObjectId: 0x%08X, function: [%s], result: [%s]}",
             this.statusCode,
             this.statusDetail,
             this.userObjectID,
             this.function,
-            this.result
+            JSON.stringify(this.result)
         );
     }
 };
@@ -654,8 +673,7 @@ eb.comm.response.prototype = {
 eb.comm.processDataResponse = function(){
 
 };
-eb.comm.processDataResponse.inheritsFrom(eb.comm.response);
-eb.comm.processDataResponse.prototype = $.extend(eb.comm.processDataResponse.prototype, {
+eb.comm.processDataResponse.inheritsFrom(eb.comm.response, {
     /**
      * Plain data parsed from the response.
      * Nor MACed neither encrypted.
@@ -705,7 +723,7 @@ eb.comm.processDataResponse.prototype = $.extend(eb.comm.processDataResponse.pro
     },
 
     toString: function(){
-        return sprintf("ProcessDataResponse{statusCode=%4X, statusDetail=[%s], userObjectId: %08X, function: [%s], " +
+        return sprintf("ProcessDataResponse{statusCode=0x%4X, statusDetail=[%s], userObjectId: 0x%08X, function: [%s], " +
             "nonce: [%s], protectedData: [%s], plainData: [%s], mac: [%s], computedMac: [%s], macOK: %d",
             this.statusCode,
             this.statusDetail,
@@ -722,6 +740,59 @@ eb.comm.processDataResponse.prototype = $.extend(eb.comm.processDataResponse.pro
 });
 
 /**
+ * EB Import public key.
+ */
+eb.comm.pubKey = function(){};
+eb.comm.pubKey.prototype = {
+    id: undefined,
+    type: undefined,
+    certificate: undefined,
+    key: undefined,
+
+    toString: function(){
+        return sprintf("pubKey{id=0x%x, type=[%s], certificate:[%s], key:[%s]",
+            this.id,
+            this.type,
+            this.certificate ? sjcl.codec.hex.fromBits(this.certificate) : "null",
+            this.key ? sjcl.codec.hex.fromBits(this.key) : "null"
+        );
+    }
+};
+
+/**
+ * pubKey response.
+ * @extends eb.comm.response
+ */
+eb.comm.pubKeyResponse = function(x){
+    eb.misc.absorb(this, x);
+};
+eb.comm.pubKeyResponse.inheritsFrom(eb.comm.response, {
+    /**
+     * Plain data parsed from the response.
+     * Nor MACed neither encrypted.
+     * @output
+     */
+    keys: [],
+
+    toString: function(){
+        var stringKeys = [], index, len, c;
+        for (index = 0, len =this.keys.length; index < len; ++index) {
+            c = this.keys[index];
+            if (c){
+                stringKeys.push(c.toString());
+            }
+        }
+
+        return sprintf("pubKeyResponse{statusCode=0x%4X, statusDetail=[%s], function: [%s], keys:[%s]",
+            this.statusCode,
+            this.statusDetail,
+            this.function,
+            stringKeys.join(", ")
+        );
+    }
+});
+
+/**
  * Raw EB Response parser.
  */
 eb.comm.responseParser = function(){
@@ -730,6 +801,7 @@ eb.comm.responseParser = function(){
 eb.comm.responseParser.prototype = {
     /**
      * Parsed response
+     * @output
      */
     response: null,
 
@@ -744,6 +816,17 @@ eb.comm.responseParser.prototype = {
      * @input
      */
     logger: null,
+
+    /**
+     * User can define response parsing function here, called in the main parse body.
+     * It is optional function callback, must return response.
+     * @input
+     */
+    _responseParsingFunction: undefined,
+    parsingFunction: function(x){
+        this._responseParsingFunction = x;
+        return this;
+    },
 
     /**
      * Returns true if after parsing, code is OK.
@@ -787,6 +870,12 @@ eb.comm.responseParser.prototype = {
             this._log("Error in processing, status: " + data.status + ", message: " + resp.statusDetail);
         }
 
+        // If parsing function is already set, use it.
+        if (this._responseParsingFunction){
+            this.response = this._responseParsingFunction(data, resp, this);
+            return this.response;
+        }
+
         return resp;
     },
 
@@ -818,8 +907,7 @@ eb.comm.processDataResponseParser = function(aesKey, macKey){
     this.aesKey = aesKey || "";
     this.macKey = macKey || "";
 };
-eb.comm.processDataResponseParser.inheritsFrom(eb.comm.responseParser);
-eb.comm.processDataResponseParser.prototype = $.extend(eb.comm.processDataResponseParser.prototype, {
+eb.comm.processDataResponseParser.inheritsFrom(eb.comm.responseParser, {
     /**
      * Parsed user object ID, integer type.
      * @input
@@ -929,20 +1017,7 @@ eb.comm.connector = function(){
 
 };
 eb.comm.connector.prototype = {
-    /**
-     * Function to call
-     * @input
-     * @default ProcessData
-     */
-    callFunction: "ProcessData",
-
-    /**
-     * Version of EB API.
-     * @input
-     * @default 1.0
-     */
-    apiVersion: "1.0",
-
+    objName: "connector",
     /**
      * Method to do REST request with. GET or POST are allowed.
      * @input
@@ -1084,9 +1159,6 @@ eb.comm.connector.prototype = {
         if ("requestTimeout" in configObject){
             this.requestTimeout = configObject.requestTimeout;
         }
-        if ("callFunction" in configObject){
-            this.callFunction = configObject.callFunction;
-        }
         if ("debuggingLog" in configObject){
             this.debuggingLog = configObject.debuggingLog;
         }
@@ -1110,8 +1182,13 @@ eb.comm.connector.prototype = {
      * @param requestBody
      */
     build: function(requestHeader, requestBody){
-        this.reqHeader = requestHeader;
-        this.reqBody = requestBody;
+        if (requestHeader) {
+            this.reqHeader = requestHeader;
+        }
+
+        if (requestBody) {
+            this.reqBody = requestBody;
+        }
     },
 
     /**
@@ -1243,7 +1320,7 @@ eb.comm.connector.prototype = {
      * @returns {*}
      */
     getApiUrl: function(){
-        return sprintf("%s://%s:%d/%s/%s/%s/%s",
+        return sprintf("%s://%s:%d/",
             this.requestScheme,
             this.remoteEndpoint,
             this.remotePort);
@@ -1261,7 +1338,7 @@ eb.comm.connector.prototype = {
     },
 
     /**
-     * Returns response parser when is needed. May lazyly initialize parser.
+     * Returns response parser when is needed. May lazily initialize parser.
      * Override point.
      *
      * @returns {*}
@@ -1280,11 +1357,7 @@ eb.comm.connector.prototype = {
      * @returns {string}
      */
     getSocketRequest: function(){
-        this._socketRequest = {
-            version:this.apiVersion,
-            function:this.callFunction
-        };
-
+        this._socketRequest = {};
         $.extend(this._socketRequest, this.reqHeader || {});
         $.extend(this._socketRequest, this.reqBody || {});
         return this._socketRequest;
@@ -1311,6 +1384,218 @@ eb.comm.connector.prototype = {
 };
 
 /**
+ * API request using the connector.
+ * Standard request with
+ *   - API version,
+ *   - API Key,
+ *   - API lower 4 bytes identifier (e.g., user object id),
+ *   - call function,
+ *   - nonce
+ *
+ * @param apiKey
+ * @param apiKeyLow4Bytes
+ */
+eb.comm.apiRequest = function(apiKey, apiKeyLow4Bytes){
+    this.apiKey = apiKey;
+    this.apiKeyLow4Bytes = apiKeyLow4Bytes;
+};
+eb.comm.apiRequest.inheritsFrom(eb.comm.connector, {
+    objName: "apiRequest",
+
+    /**
+     * Function to call
+     * @input
+     * @default ProcessData
+     */
+    callFunction: "ProcessData",
+
+    /**
+     * User API key
+     * @input
+     */
+    apiKey: undefined,
+
+    /**
+     * Lower 4 API bytes to use for api token.
+     * For process data this may be UseObjectId.
+     * @input
+     */
+    apiKeyLow4Bytes: undefined,
+
+    /**
+     * Version of EB API.
+     * @input
+     * @default 1.0
+     */
+    apiVersion: "1.0",
+
+    /**
+     * Nonce generated for the request.
+     * @input
+     * @output
+     */
+    nonce: undefined,
+
+    /**
+     * Composite API key for the request.
+     * Generated before request is sent.
+     * @private
+     */
+    _apiKeyReq: "",
+
+    /**
+     * Builds API key token.
+     * Consists of apiKey and low4B identifier.
+     * Can be specified by parameters or currently set values are set.
+     * Result is returned and set to the property.
+     *
+     * @param apiKey
+     * @param apiLow4b
+     */
+    buildApiBlock: function(apiKey, apiLow4b){
+        apiKey = apiKey || this.apiKey;
+        apiLow4b = apiLow4b || this.apiKeyLow4Bytes;
+        this._apiKeyReq = sprintf("%s%010x", apiKey, apiLow4b);
+        return this._apiKeyReq;
+    },
+
+    /**
+     * Builds standard request header from existing fields.
+     */
+    buildReqHeader: function() {
+        this.reqHeader = {
+            objectid:this._apiKeyReq,
+            function:this.callFunction,
+            nonce:this.getNonce(),
+            version:this.apiVersion
+        };
+        return this.reqHeader;
+    },
+
+    /**
+     * Returns currently set nonce.
+     * Generates a new one if is undefined.
+     * @returns {*}
+     */
+    getNonce: function(){
+        if (!this.nonce){
+            return this.genNonce();
+        }
+
+        return this.nonce;
+    },
+
+    /**
+     * Generates new nonce, sets it as a current nonce for the request.
+     * @returns {string|*|string}
+     */
+    genNonce: function(){
+        this.nonce = eb.misc.genHexNonce(16);
+        return this.nonce;
+    },
+
+    /**
+     * Process configuration from the config object.
+     * @param configObject java object with the configuration.
+     */
+    configure: function(configObject){
+        if (!configObject){
+            this._log("Invalid config object");
+            return;
+        }
+
+        // Configure with parent.
+        eb.comm.apiRequest.superclass.configure.call(this, configObject);
+
+        // Configure this.
+        if ("callFunction" in configObject){
+            this.callFunction = configObject.callFunction;
+        }
+        if ("apiKey" in configObject){
+            this.apiKey = configObject.apiKey;
+        }
+        if ("apiKeyLow4Bytes" in configObject){
+            this.apiKeyLow4Bytes = configObject.apiKeyLow4Bytes;
+        }
+        if ("nonce" in configObject){
+            this.nonce = configObject.nonce;
+        }
+    },
+
+    /**
+     * Returns remote API URL to query with Ajax.
+     * According to current request settings.
+     * Note: Request has to be built when calling this function.
+     *
+     * @returns {*}
+     */
+    getApiUrl: function(){
+        if (this.requestMethod == "POST" || (this.requestMethod == "GET" && !this.reqBody)){
+            return sprintf("%s://%s:%d/%s/%s/%s/%s",
+                this.requestScheme,
+                this.remoteEndpoint,
+                this.remotePort,
+                this.apiVersion,
+                this._apiKeyReq,
+                this.callFunction,
+                this.getNonce());
+
+        } else if (this.requestMethod == "GET"){
+            return sprintf("%s://%s:%d/%s/%s/%s/%s/%s",
+                this.requestScheme,
+                this.remoteEndpoint,
+                this.remotePort,
+                this.apiVersion,
+                this._apiKeyReq,
+                this.callFunction,
+                this.getNonce(),
+                JSON.stringify(this.reqBody));
+
+        } else {
+            throw new eb.exception.invalid("Invalid configuration, unknown method: " + this.requestMethod);
+        }
+    },
+
+    /**
+     * Returns Ajax request data.
+     * According to current request settings.
+     * Note: Request has to be built when calling this function.
+     *
+     * @returns {*}
+     */
+    getApiRequestData: function(){
+        if (this.requestMethod == "POST") {
+            return this.reqBody;
+        } else {
+            return {};
+        }
+    },
+
+    /**
+     * Initializes state and builds request
+     * @param requestHeader
+     * @param requestBody
+     */
+    build: function(requestHeader, requestBody){
+        if (requestHeader.apiKey && requestHeader.apiKeyLow4Bytes){
+            this.buildApiBlock(requestHeader.apiKey, requestHeader.apiKeyLow4Bytes);
+        } else {
+            this.buildApiBlock();
+        }
+
+        if (requestBody){
+            this.reqBody = requestBody;
+        }
+
+        if (requestHeader){
+            this.reqHeader = requestHeader;
+        }
+
+        this.buildReqHeader();
+    },
+});
+
+/**
  * Process data request to the EB.
  * @param apiKey
  * @param aesKey
@@ -1324,8 +1609,7 @@ eb.comm.processData = function(apiKey, aesKey, macKey, userObjectId){
     this.userObjectId = userObjectId || -1;
     this.callFunction = "ProcessData";
 };
-eb.comm.processData.inheritsFrom(eb.comm.connector);
-eb.comm.processData.prototype = $.extend(eb.comm.processData.prototype, {
+eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
     /**
      * User object ID to perform operation with, integer type.
      * @input
@@ -1352,55 +1636,16 @@ eb.comm.processData.prototype = $.extend(eb.comm.processData.prototype, {
     callRequestType: "PLAINAES",
 
     /**
-     * User API key
-     * @input
-     */
-    apiKey: "",
-
-    /**
      * Request builder used to build the request.
      * @output
      */
     processDataRequestBodyBuilder: null,
 
     /**
-     * Composite API key for the request.
-     * Generated before request is sent.
-     * @private
-     */
-    _apiKeyReq: "",
-
-    /**
      * Request block generated by request builder.
      * @private
      */
     _requestBlock: "",
-
-    /**
-     * Returns nonce from the request builder. If set.
-     * @returns {*}
-     */
-    getNonce: function(){
-        if (this.processDataRequestBodyBuilder == null){
-            return null;
-        }
-
-        return this.processDataRequestBodyBuilder.nonce;
-    },
-
-    /**
-     * Generates new nonce to the request builder.
-     * If request builder is null, new is constructed.
-     * @returns {string|*|string}
-     */
-    genNonce: function(){
-        if (this.processDataRequestBodyBuilder == null){
-            this.processDataRequestBodyBuilder = new eb.comm.processDataRequestBodyBuilder();
-        }
-
-        this.processDataRequestBodyBuilder.nonce = eb.misc.genHexNonce(16);
-        return this.processDataRequestBodyBuilder.nonce;
-    },
 
     /**
      * Process configuration from the config object.
@@ -1412,8 +1657,13 @@ eb.comm.processData.prototype = $.extend(eb.comm.processData.prototype, {
             return;
         }
 
+        var toConfig = configObject;
+        if ("userObjectId" in configObject){
+            toConfig = $.extend(toConfig, {apiKeyLow4Bytes : configObject.userObjectId});
+        }
+
         // Configure with parent.
-        this.parent.configure.call(this, configObject);
+        eb.comm.processData.superclass.configure.call(this, toConfig);
 
         // Configure this.
         if ("aesKey" in configObject){
@@ -1422,11 +1672,9 @@ eb.comm.processData.prototype = $.extend(eb.comm.processData.prototype, {
         if ("macKey" in configObject){
             this.macKey = configObject.macKey;
         }
-        if ("apiKey" in configObject){
-            this.apiKey = configObject.apiKey;
-        }
         if ("userObjectId" in configObject){
             this.userObjectId = configObject.userObjectId;
+            this.apiKeyLow4Bytes = configObject.userObjectId;
         }
     },
 
@@ -1437,7 +1685,10 @@ eb.comm.processData.prototype = $.extend(eb.comm.processData.prototype, {
      */
     build: function(plainData, requestData){
         this._log("Building request body");
-        this._apiKeyReq = sprintf("%s%010x", this.apiKey, this.userObjectId);
+
+        // Request header data.
+        this.buildApiBlock(this.apiKey, this.userObjectId);
+        this.buildReqHeader();
 
         // Build a new EB request.
         this.processDataRequestBodyBuilder = new eb.comm.processDataRequestBodyBuilder();
@@ -1447,22 +1698,16 @@ eb.comm.processData.prototype = $.extend(eb.comm.processData.prototype, {
         this.processDataRequestBodyBuilder.reqType = this.callRequestType;
         this.processDataRequestBodyBuilder.debuggingLog = this.debuggingLog;
         this.processDataRequestBodyBuilder.logger = this.logger;
-        this.processDataRequestBodyBuilder.genNonce();
+        this.processDataRequestBodyBuilder.nonce = this.getNonce();
 
         this._requestBlock = this.processDataRequestBodyBuilder.build(plainData, requestData);
         this.reqBody = {data : this._requestBlock};
-        this.reqHeader = {
-            objectid:this._apiKeyReq,
-            function:this.callFunction,
-            nonce:this.getNonce(),
-            version:this.apiVersion
-        };
 
-        var nonce = this.processDataRequestBodyBuilder.nonce;
+        var nonce = this.getNonce();
         var url = this.getApiUrl();
         var apiData = this.getApiRequestData();
 
-        this._log("Nonce generated: " + nonce);
+        this._log("Nonce: " + nonce);
         this._log("URL: " + url + ", method: " + this.requestMethod);
         this._log("UserData: " + JSON.stringify(apiData));
         this._log("SocketReq: " + JSON.stringify(this.getSocketRequest()));
@@ -1480,7 +1725,7 @@ eb.comm.processData.prototype = $.extend(eb.comm.processData.prototype, {
             this.build(requestHeader, requestBody);
         }
 
-        this.parent.doRequest.call(this);
+        eb.comm.processData.superclass.doRequest.call(this);
     },
 
     /**
@@ -1510,7 +1755,7 @@ eb.comm.processData.prototype = $.extend(eb.comm.processData.prototype, {
                 this._apiKeyReq,
                 this.callFunction,
                 this.getNonce(),
-                this._requestBlock);
+                this.reqBody.data);
 
         } else {
             throw new eb.exception.invalid("Invalid configuration, unknown method: " + this.requestMethod);
@@ -1533,7 +1778,7 @@ eb.comm.processData.prototype = $.extend(eb.comm.processData.prototype, {
     },
 
     /**
-     * Returns response parser when is needed. May lazyly initialize parser.
+     * Returns response parser when is needed. May lazily initialize parser.
      * Override point.
      *
      * @returns {*}
@@ -1544,6 +1789,88 @@ eb.comm.processData.prototype = $.extend(eb.comm.processData.prototype, {
         this.responseParser.logger = this.logger;
         this.responseParser.aesKey = this.aesKey;
         this.responseParser.macKey = this.macKey;
+        return this.responseParser;
+    }
+});
+
+/**
+ * Request obtaining import public keys.
+ */
+eb.comm.getPubKey = function(){
+    this.callFunction = "GetImportPublicKey";
+};
+eb.comm.getPubKey.inheritsFrom(eb.comm.apiRequest, {
+    objName: "getPubKey",
+
+    /**
+     * Initializes state and builds request
+     */
+    build: function(){
+        this._log("Building request body");
+
+        // Request header data.
+        this.buildApiBlock(this.apiKey, this.userObjectId);
+        this.buildReqHeader();
+        this.reqBody = {};
+
+        var nonce = this.getNonce();
+        var url = this.getApiUrl();
+        this._log("Nonce generated: " + nonce);
+        this._log("URL: " + url + ", method: " + this.requestMethod);
+        this._log("SocketReq: " + JSON.stringify(this.getSocketRequest()));
+    },
+
+    /**
+     * Returns response parser when is needed. May lazily initialize parser.
+     * Override point.
+     *
+     * @returns {*}
+     */
+    getResponseParser: function(){
+        // Generic parser with given parsing function.
+        var pubKeyParser = new eb.comm.responseParser();
+        pubKeyParser.parsingFunction(function(data, resp, parser){
+            var response = new eb.comm.pubKeyResponse(resp);
+
+            /**
+             * Response:
+             * {"function":"GetImportPublicKey","result":[
+             * {"certificate":null,"id":263,"type":"rsa","key":"81 00 03 01 00 01 82 01 00 e1 e0 6b 76 f9 7b cd 82 7c 98 cc 3b 41 a8 50 40 cc dc 61 cf 72 58 14 fd b9 e9 5f 53 06 29 12 e9 39 b1 3c f1 ce 27 d0 7b 44 78 57 7a 20 9c ff db de a2 90 29 19 c0 87 08 8f 85 d5 ed 1d 0b 0c dc ef d8 23 b6 49 71 4f 69 95 31 d9 b8 10 08 af 63 5e a9 79 67 82 fe 3c 40 3c 0e 5d e2 15 58 78 06 f3 0e 16 09 4d a0 16 05 89 e9 80 1c ba f4 0e 63 fd 2d 72 cb 85 cb 7f c1 9a 37 7b 0f a9 2e 7d 90 8e 6a 69 aa bc 4c 5b a2 2d 32 e5 58 7e 0e d8 12 b4 c1 62 66 84 98 fd e5 54 08 93 c1 c0 88 41 51 60 93 93 d8 cc cd ee 3e eb 88 ae 91 24 32 16 b2 26 92 73 f9 a5 23 b9 5c cf e5 b1 f9 e5 4f d2 4f 73 77 a2 ab d7 c6 43 9e c4 60 97 c4 70 1e 58 c2 49 33 02 2d 43 8b 77 67 3c 30 0e a6 81 e4 73 d2 46 18 f9 79 40 3d a6 79 dd 5c 3c e0 b7 4c 16 a9 5c 96 47 40 7c 2c dc 11 3b 92 75 44 ec d8 c6 95 "},
+             * {"certificate":null,"id":264,"type":"rsa","key":"81 00 03 01 00 01 82 01 00 e1 e0 6b 76 f9 7b cd 82 7c 98 cc 3b 41 a8 50 40 cc dc 61 cf 72 58 14 fd b9 e9 5f 53 06 29 12 e9 39 b1 3c f1 ce 27 d0 7b 44 78 57 7a 20 9c ff db de a2 90 29 19 c0 87 08 8f 85 d5 ed 1d 0b 0c dc ef d8 23 b6 49 71 4f 69 95 31 d9 b8 10 08 af 63 5e a9 79 67 82 fe 3c 40 3c 0e 5d e2 15 58 78 06 f3 0e 16 09 4d a0 16 05 89 e9 80 1c ba f4 0e 63 fd 2d 72 cb 85 cb 7f c1 9a 37 7b 0f a9 2e 7d 90 8e 6a 69 aa bc 4c 5b a2 2d 32 e5 58 7e 0e d8 12 b4 c1 62 66 84 98 fd e5 54 08 93 c1 c0 88 41 51 60 93 93 d8 cc cd ee 3e eb 88 ae 91 24 32 16 b2 26 92 73 f9 a5 23 b9 5c cf e5 b1 f9 e5 4f d2 4f 73 77 a2 ab d7 c6 43 9e c4 60 97 c4 70 1e 58 c2 49 33 02 2d 43 8b 77 67 3c 30 0e a6 81 e4 73 d2 46 18 f9 79 40 3d a6 79 dd 5c 3c e0 b7 4c 16 a9 5c 96 47 40 7c 2c dc 11 3b 92 75 44 ec d8 c6 95 "}]
+             * ,"status":"9000","statusdetail":"(OK)SW_STAT_OK","version":"1.0"}
+             */
+            if (!data.result || !data.result.length) {
+                parser._log("Result is not an array");
+                return;
+            }
+
+            response.keys = [];
+            var index, len, cur, cKey, ok;
+            for (index = 0, len = data.result.length; index < len; ++index) {
+                cur = data.result[index];
+                cKey = new eb.comm.pubKey();
+                if (!("id" in cur && "key" in cur)){
+                    continue;
+                }
+
+                cKey.id = cur.id;
+                cKey.type = cur.type;
+                if ("certificate" in cur && cur.certificate){
+                    var noSpaceCrt = cur.certificate.replace(/\s+/g,'');
+                    cKey.certificate = sjcl.codec.hex.toBits(noSpaceCrt);
+                }
+
+                if ("key" in cur && cur.key){
+                    var noSpaceKey = cur.key.replace(/\s+/g,'');
+                    cKey.key = sjcl.codec.hex.toBits(noSpaceKey);
+                }
+
+                response.keys.push(cKey);
+            }
+            return response;
+        });
+
+        this.responseParser = pubKeyParser;
         return this.responseParser;
     }
 });
