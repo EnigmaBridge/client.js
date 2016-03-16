@@ -310,7 +310,7 @@ eb.padding.pkcs15 = {
 
         // If data position is out of scope, return nothing.
         if (dataPosStart < 0 || dataPosStart > blb){
-            throw new sjcl.exception.corrupt("Padding could not be parsed");
+            throw new sjcl.exception.corrupt("Padding could not be parsed, dataStart=" + dataPosStart + ", len="+blb);
         }
 
         // Check size of the output buffer.
@@ -1630,6 +1630,8 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
 
     /**
      * Type of the data request.
+     * PLAINAES for AES keys, RSA2048 for RSA-2048 keys.
+     *
      * @input
      * @default PLAINAES
      */
@@ -1675,6 +1677,9 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
         if ("userObjectId" in configObject){
             this.userObjectId = configObject.userObjectId;
             this.apiKeyLow4Bytes = configObject.userObjectId;
+        }
+        if ("callRequestType" in configObject){
+            this.callRequestType = configObject.callRequestType;
         }
     },
 
