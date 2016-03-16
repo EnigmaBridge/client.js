@@ -47,7 +47,12 @@
                 Function input
                 <input type="text" name="data" id="data" placeholder="Function input"/>
                 <span>Input data to the <em>ProcessData()</em>. Will be encypted and MACed in transfer.
-                    TestVector: <a onclick="$('#data').val('6bc1bee22e409f96e93d7e117393172a');">6bc1bee22e409f96e93d7e117393172a</a>
+                    <a onclick="$('#data').val('6bc1bee22e409f96e93d7e117393172a');">AES-256 testvector</a>,
+                    <a onclick="$('#data').val('11223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788')">RSA-2048 testvector</a>,
+                    <a onclick="$('#data').val(pkcs7pad($('#data').val()));">PKCS#7 pad</a>,
+                    <a onclick="$('#data').val(pkcs15pad($('#data').val(),2048/8));">PKCS#1.5 pad</a>
+                    <a onclick="$('#data').val(pkcs7unpad($('#data').val()));">PKCS#7 unpad</a>,
+                    <a onclick="$('#data').val(pkcs15unpad($('#data').val(),2048/8));">PKCS#1.5 unpad</a>
                 </span>
             </label>
         </div>
@@ -64,6 +69,13 @@
                 <span>Hexcoded user object ID stored in EB you want to work with.
                     RSA decrypt: <a onclick="$('#userObjectID').val('EE03');">0xEE03</a>,
                     AES encrypt: <a onclick="$('#userObjectID').val('EE01');">0xEE01</a></span>
+            </label>
+
+            <label>ProcessData method
+                <input type="text" name="processDataMethod" id="processDataMethod" value="PLAINAES"/>
+                <span><a onclick="$('#processDataMethod').val('PLAINAES');">PLAINAES</a> for operation with AES UO,
+                      <a onclick="$('#processDataMethod').val('RSA2048');">RSA2048</a> for operation with RSA-2048 UO,
+                </span>
             </label>
 
             <label>Endpoint
@@ -141,6 +153,22 @@
         status.html(status.html() + "<br/>\n" + newMsg);
     }
 
+    function pkcs7pad(data){
+        return sjcl.codec.hex.fromBits(eb.padding.pkcs7.pad(sjcl.codec.hex.toBits(data)));
+    }
+
+    function pkcs15pad(data, blockLen){
+        return sjcl.codec.hex.fromBits(eb.padding.pkcs15.pad(sjcl.codec.hex.toBits(data), blockLen, 1));
+    }
+
+    function pkcs7unpad(data){
+        return sjcl.codec.hex.fromBits(eb.padding.pkcs7.unpad(sjcl.codec.hex.toBits(data)));
+    }
+
+    function pkcs15unpad(data, blockLen){
+        return sjcl.codec.hex.fromBits(eb.padding.pkcs15.unpad(sjcl.codec.hex.toBits(data), blockLen));
+    }
+
     function log(msg){
         console.log(msg);
         append_message(msg);
@@ -206,6 +234,7 @@
         var h = sjcl.codec.hex;
         var aesKey = $('#aesKey').val();
         var macKey = $('#macKey').val();
+        var pDataMethod = $('#processDataMethod').val();
         var plainData = h.toBits(plainDataInp || "");
         var requestData = h.toBits(dataInp || ""); //sjcl.codec.utf8String.toBits(data);
 
@@ -226,7 +255,8 @@
         var endpointConfig = getSettings();
         var userConfig = {
             aesKey: aesKey,
-            macKey: macKey
+            macKey: macKey,
+            callRequestType: pDataMethod
         };
 
         var request = new eb.comm.processData();
