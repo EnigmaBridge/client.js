@@ -467,6 +467,21 @@ eb.comm = {
 
 /**
  * Raw EB request builder.
+ *
+ * Data format before encryption:
+ * buff = 0x1f | <UOID-4B> | <freshness-nonce-8B> | userdata
+ *
+ * Encryption
+ * AES-256/CBC/PKCS7, IV = 0x00000000000000000000000000000000
+ *
+ * MAC
+ * AES-256-CBC-MAC.
+ *
+ * encBlock = enc(buff)
+ * result = encBlock || mac(encBlock)
+ *
+ * output = Packet0| _PLAINAES_ | <plain-data-length-4B> | <plaindata> | hexcode(result)
+ *
  * @param nonce
  * @param aesKey
  * @param macKey
@@ -537,21 +552,6 @@ eb.comm.processDataRequestBodyBuilder.prototype = {
      */
     build: function(plainData, requestData){
         this.nonce = this.nonce || eb.misc.genHexNonce(16);
-
-        // Data format before encryption:
-        // buff = 0x1f | <UOID-4B> | userdata
-        //
-        // Encryption
-        // AES-256/CBC/PKCS7, IV = 0x00000000000000000000000000000000
-        //
-        // MAC
-        // AES-256-CBC-MAC.
-        //
-        // encBlock = enc(buff)
-        // result = encBlock || mac(plaindata || encBlock)
-        //
-        // output = Packet0| _PLAINAES_ | <plain-data-length-4B> | <plaindata> | hexcode(result)
-
         var h = sjcl.codec.hex;
         var ba = sjcl.bitArray;
         var pad = eb.padding.pkcs7;
