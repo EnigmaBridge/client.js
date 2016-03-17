@@ -46,13 +46,18 @@
             <label>
                 Function input
                 <input type="text" name="data" id="data" placeholder="Function input"/>
-                <span>Input data to the <em>ProcessData()</em>. Will be encypted and MACed in transfer.
+                <span>Input data to the <em>ProcessData()</em>. Will be encypted and MACed in transfer.<br/>
                     <a onclick="$('#data').val('6bc1bee22e409f96e93d7e117393172a');">AES-256 testvector</a>,
+                    <a onclick="$('#data').val('1122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788')">RSA-1024 testvector</a>,
+                    <a onclick="$('#data').val('0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001')">RSA-1024 one</a>,
                     <a onclick="$('#data').val('11223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788')">RSA-2048 testvector</a>,
+                    <br/>
                     <a onclick="$('#data').val(pkcs7pad($('#data').val()));">PKCS#7 pad</a>,
-                    <a onclick="$('#data').val(pkcs15pad($('#data').val(),2048/8));">PKCS#1.5 pad</a>
-                    <a onclick="$('#data').val(pkcs7unpad($('#data').val()));">PKCS#7 unpad</a>,
-                    <a onclick="$('#data').val(pkcs15unpad($('#data').val(),2048/8));">PKCS#1.5 unpad</a>
+                    <a onclick="$('#data').val(pkcs7unpad($('#data').val()));">PKCS#7 unpad</a>,<br/>
+                    <a onclick="$('#data').val(pkcs15pad($('#data').val(),1024/8));">PKCS#1.5 pad 1024</a>,
+                    <a onclick="$('#data').val(pkcs15unpad($('#data').val(),1024/8));">PKCS#1.5 unpad 1024</a>,<br/>
+                    <a onclick="$('#data').val(pkcs15pad($('#data').val(),2048/8));">PKCS#1.5 pad 2048</a>,
+                    <a onclick="$('#data').val(pkcs15unpad($('#data').val(),2048/8));">PKCS#1.5 unpad 2048</a><br/>
                 </span>
             </label>
         </div>
@@ -67,13 +72,15 @@
             <label>User object ID
                 <input type="text" name="userObjectID" id="userObjectID" value="EE01"/>
                 <span>Hexcoded user object ID stored in EB you want to work with.
-                    RSA decrypt: <a onclick="$('#userObjectID').val('EE03');">0xEE03</a>,
-                    AES encrypt: <a onclick="$('#userObjectID').val('EE01');">0xEE01</a></span>
+                    RSA-1024 decrypt: <a onclick="$('#userObjectID').val('7654');">0x7654</a>,
+                    RSA-2048 decrypt: <a onclick="$('#userObjectID').val('EE03');">0xEE03</a>,
+                    AES-256 encrypt: <a onclick="$('#userObjectID').val('EE01');">0xEE01</a></span>
             </label>
 
             <label>ProcessData method
                 <input type="text" name="processDataMethod" id="processDataMethod" value="PLAINAES"/>
                 <span><a onclick="$('#processDataMethod').val('PLAINAES');">PLAINAES</a> for operation with AES UO,
+                      <a onclick="$('#processDataMethod').val('RSA1024');">RSA1024</a> for operation with RSA-1024 UO,
                       <a onclick="$('#processDataMethod').val('RSA2048');">RSA2048</a> for operation with RSA-2048 UO,
                 </span>
             </label>
@@ -99,14 +106,19 @@
 
             <label>AES encryption key
                 <input type="text" name="aesKey" id="aesKey" value="e134567890123456789012345678901234567890123456789012345678901234"/>
-                <span>Hexcoded encryption API key</span>
+                <span>Hexcoded encryption API key
+                    <a onclick="$('#aesKey').val('1234567890123456789012345678901234567890123456789012345678901234');">RSA comm key</a>,
+                    <a onclick="$('#aesKey').val('e134567890123456789012345678901234567890123456789012345678901234');">AES comm key</a>
+                </span>
             </label>
 
             <label>MAC key
                 <input type="text" name="macKey" id="macKey" value="e224262820223456789012345678901234567890123456789012345678901234"/>
-                <span>Hexcoded hmac API key</span>
+                <span>Hexcoded hmac API key
+                    <a onclick="$('#macKey').val('2224262820223456789012345678901234567890123456789012345678901234');">RSA comm key</a>
+                    <a onclick="$('#macKey').val('e224262820223456789012345678901234567890123456789012345678901234');">AES comm key</a>
+                </span>
             </label>
-
         </div>
         <div class="button-section">
             <input type="button" id="btnProcessData" value="ProcessData"/>
@@ -158,7 +170,7 @@
     }
 
     function pkcs15pad(data, blockLen){
-        return sjcl.codec.hex.fromBits(eb.padding.pkcs15.pad(sjcl.codec.hex.toBits(data), blockLen, 1));
+        return sjcl.codec.hex.fromBits(eb.padding.pkcs15.pad(sjcl.codec.hex.toBits(data), blockLen, 0));
     }
 
     function pkcs7unpad(data){
