@@ -101,6 +101,233 @@ eb.misc = {
     }
 };
 
+eb.codec = {};
+
+/**
+ * Fault tolerant utf8 codec for user entries.
+ * When converting from hexcoded string to raw data, data may contain both UTF8 characters and hex-coded characters.
+ * Parsing result finds utf8 characters in the hexbytes. If byte sequence does not form valid utf8 character, it is
+ * parsed as ordinary hex sequence.
+ *
+ * When converting from raw data to hexdata, utf8 characters are allowed. Moreover it supports individual byte coding
+ * \x[A-Fa-f0-9]{2} and backslash escaping \\. Single individual backslash is ignored.
+ * @type {{}}
+ */
+eb.codec.utf8 = {
+    toHex: function(x, options) {
+        var i, ln = x.length;
+        var out = "";
+
+        for (i = 0; i < ln; i++) {
+            var cChar = x.charAt(i);
+            var remChars = (ln - i - 1);
+
+            console.log("cChar: " + cChar);
+            if (cChar === '\\') {
+                // Byte coding \xFF ?
+                if (remChars >= 3) {
+                    var hCode = x.substring(i, i + 4);
+                    var hRegex = /\\x([a-fA-F0-9]{2})/g;
+                    var match = hRegex.exec(hCode);
+                    if (match) {
+                        out += match[1];
+                        i += 3;
+                        continue;
+                    }
+                }
+
+                // Escaping \\ ?
+                if (remChars >= 1) {
+                    var nChar = x.substring(i + 1, i + 2);
+                    if (nChar === '\\') {
+                        out += Number('\\'.charCodeAt(0)).toString(16);
+                        i += 1;
+                        continue;
+                    }
+                }
+
+                // Invalid escaping, ignore this backslash.
+                continue;
+            }
+
+            // Get UTF8 hex representation.
+            var cc = unescape(encodeURIComponent(cChar));
+            var jj, llen;
+            for (jj = 0, llen = cc.length; jj < llen; jj++) {
+                var chNum = (Number(cc.charCodeAt(jj))).toString(16);
+                if ((chNum.length & 1) == 1) {
+                    chNum = "0" + chNum;
+                }
+                out += chNum;
+            }
+        }
+
+        return out;
+    },
+
+    /**
+     * Converts hexcoded string to raw data.
+     * @param x
+     * @param options
+     * @returns {string}
+     */
+    fromHex: function(x, options) {
+        var parsed = eb.codec.utf8.fromHexParse(x, options);
+        var str="";
+        var cur, i, len;
+        for(i=0, len=parsed.parsed.length; i<len; i++){
+            cur=parsed.parsed[i];
+            str += cur.utf8 ? cur.rep : cur.enc;
+        }
+
+        return str;
+    },
+
+    /**
+     * Parses hex coded string, can accept utf8 characters.
+     * @param x
+     * @param options,
+     *      - if acceptUtf8==false, UTF8 characters are not recognized, each character has 1 byte encoding. Default = true,
+     *        thus UTF8 characters are recognized and parsed.
+     *      - if acceptOnlyUtf8==true, non-UTF8 characters are skipped, otherwise they are parsed as hexcoded.
+     *
+     * @returns {{nonUtf8Chars: number, parsed: Array}}
+     */
+    fromHexParse: function(x, options) {
+        var defaults = {
+            'acceptUtf8': true,
+            'acceptOnlyUtf8': false
+        };
+
+        options = $.extend(defaults, options || {});
+        var acceptUtf8 = options && options.acceptUtf8;
+        var acceptOnlyUtf8 = options && options.acceptOnlyUtf8;
+
+        // Process only even lengths.
+        var ln = x.length;
+        if ((ln & 1) == 1) {
+            ln-=1;
+        }
+
+        var nonUtf8Chars = 0;
+        var i, cByte, cBits, cStr, cNum;
+        var out = [];
+
+        // UTF8 encoding table
+        //7 	U+0000	    U+007F	    1	0xxxxxxx
+        //11	U+0080	    U+07FF	    2	110xxxxx	10xxxxxx
+        //16	U+0800	    U+FFFF	    3	1110xxxx	10xxxxxx	10xxxxxx
+        //21	U+10000	    U+1FFFFF	4	11110xxx	10xxxxxx	10xxxxxx	10xxxxxx
+        //26	U+200000	U+3FFFFFF	5	111110xx	10xxxxxx	10xxxxxx	10xxxxxx	10xxxxxx
+        //31	U+4000000	U+7FFFFFFF	6	1111110x	10xxxxxx	10xxxxxx	10xxxxxx	10xxxxxx	10xxxxxx
+        for(i=0; i<ln; i+=2){
+            cByte = (x[i] + x[i+1]).toUpperCase();
+            cBits = h.toBits(cByte);
+            cNum = sjcl.bitArray.extract(cBits,0,8);
+
+            // 1byte char representation. ASCII.
+            if (!acceptUtf8 || (cNum & 0x80) == 0){
+                out.push({
+                    'b':1,
+                    'utf8':true,
+                    'hex':cByte,
+                    'enc':String.fromCharCode(cNum),
+                    'rep':cNum < 32 || cNum >= 127 ? "\\x" + cByte : String.fromCharCode(cNum)});
+                continue;
+            }
+
+            // Look for utf8 character.
+            var remBytes = (ln-i-2)/2;
+            var valid = false;
+            var j = 0;
+            for(j=2; j<=6; j++){
+                // Create first UTF8 byte mask signature, j = number of bytes character occupies.
+                var signature = (Math.pow(2, j)-1)<<1;
+                var byteLow = cNum >> (8-j-1);
+                if (signature !== byteLow){
+                    continue;
+                }
+
+                // Signature matched, check if there is enough number of bytes in the buffer
+                if (remBytes < (j-1)){
+                    break;
+                }
+
+                // Start building \uxxxx representation.
+                var utfOut = h.toBits(sprintf("0000%x", cNum & ((1<<(8-j-1))-1) ) );
+                var utfOutLen = sjcl.bitArray.bitLength(utfOut);
+                if (utfOutLen > (8-j-1)){
+                    utfOut = sjcl.bitArray.bitSlice(utfOut, utfOutLen-(8-j-1));
+                }
+
+                // Check if each next byte has 10xxxxxx format.
+                var k = 0;
+                var byteValid = true;
+                for(k=0; k<j-1; k++){
+                    var nByte = eb.codec.utf8.getByte(x, i+2+2*k);
+                    if ((nByte >>> 6) != 2){
+                        byteValid = false;
+                        break;
+                    }
+
+                    var cBitArray = h.toBits(sprintf("0000%x", nByte & ((1<<6)-1) ) );
+                    var cBitLen = sjcl.bitArray.bitLength(cBitArray);
+                    if (cBitLen >= 7){
+                        cBitArray = sjcl.bitArray.bitSlice(cBitArray, cBitLen-6);
+                    }
+
+                    utfOut = sjcl.bitArray.concat(utfOut, cBitArray);
+                }
+
+                // Successing were not in the 10xxxxxx format.
+                if(!byteValid){
+                    break;
+                }
+
+                // utfOut needs to be left padded with zeros to be correctly interpreted.
+                utfOutLen = sjcl.bitArray.bitLength(utfOut);
+                if ((utfOutLen & 7) != 0){
+                    var toPadLen = 8-(utfOutLen & 7);
+                    utfOut = sjcl.bitArray.concat(sjcl.bitArray.bitSlice(h.toBits("00"),0,toPadLen), utfOut);
+                }
+
+                valid=true;
+                out.push({
+                    'b':j,
+                    'utf8':true,
+                    'hex':cByte + x.substring(i+2, i+2+(j-1)*2),
+                    'enc':"\\u" + h.fromBits(utfOut),
+                    'rep':String.fromCharCode(parseInt(h.fromBits(utfOut), 16))
+                });
+
+                i+=2*(j-1);
+                break;
+            }
+
+            if (valid || acceptOnlyUtf8){
+                continue;
+            }
+
+            out.push({
+                'b':1,
+                'utf8':false,
+                'hex':cByte,
+                'enc':"\\x" + cByte,
+                'rep':"\\x" + cByte});
+
+            nonUtf8Chars+=1;
+        }
+
+        return {'nonUtf8Chars':nonUtf8Chars, 'parsed':out};
+    },
+
+    getByte: function (str, offset){
+        var cByte = str[offset] + str[offset+1];
+        var cBits = h.toBits(cByte);
+        return sjcl.bitArray.extract(cBits,0,8);
+    }
+};
+
 /**
  * EB padding schemes wrapper.
  * @type {{name: string}}
