@@ -226,12 +226,17 @@ eb.codec.utf8 = {
 
             // 1byte char representation. ASCII.
             if (!acceptUtf8 || (cNum & 0x80) == 0){
+                var tmpChar = String.fromCharCode(cNum);
+                if (tmpChar === "\\"){
+                    tmpChar = "\\\\";
+                }
+
                 out.push({
                     'b':1,
                     'utf8':true,
                     'hex':cByte,
                     'enc':String.fromCharCode(cNum),
-                    'rep':cNum < 32 || cNum >= 127 ? "\\x" + cByte : String.fromCharCode(cNum)});
+                    'rep':cNum < 32 || cNum >= 127 ? "\\x" + cByte : tmpChar});
                 continue;
             }
 
