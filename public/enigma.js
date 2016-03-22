@@ -798,7 +798,7 @@ eb.comm.processDataRequestBodyBuilder.prototype = {
         baBuff = ba.concat(baBuff, requestData);
         // Add padding.
         baBuff = pad.pad(baBuff);
-        this._log("ProcessData input: " + h.fromBits(baBuff) + "; len: " + ba.bitLength(baBuff));
+        this._log('ProcessData function input PDIN (0x1f | <UOID-4B> | <nonce-8B> | data | pkcs#7padding) : ' + h.fromBits(baBuff) + "; len: " + ba.bitLength(baBuff));
 
         var aesKeyBits = h.toBits(this.aesKey);
         var macKeyBits = h.toBits(this.macKey);
@@ -810,14 +810,14 @@ eb.comm.processDataRequestBodyBuilder.prototype = {
         // IV is null, nonce in the first block is kind of IV.
         var IV = h.toBits('00'.repeat(16));
         var encryptedData = sjcl.mode.cbc.encrypt(aes, baBuff, IV, [], true);
-        this._log("encrypted: " + h.fromBits(encryptedData) + ", len=" + ba.bitLength(encryptedData));
+        this._log('Encrypted ProcessData input ENC(PDIN): ' + h.fromBits(encryptedData) + ", len=" + ba.bitLength(encryptedData));
 
         // include plain data in the MAC if non-empty.
         var hmacData = hmac.mac(encryptedData);
-        this._log("hmacData: " + h.fromBits(hmacData));
+        this._log('MAC(ENC(PDIN)): ' + h.fromBits(hmacData));
 
         // Build the request block.
-        var requestBase = sprintf("Packet0_%s_%04X%s%s%s",
+        var requestBase = sprintf('Packet0_%s_%04X%s%s%s',
             this.reqType,
             plainDataLength,
             h.fromBits(plainData),
@@ -825,7 +825,7 @@ eb.comm.processDataRequestBodyBuilder.prototype = {
             h.fromBits(hmacData)
         );
 
-        this._log("request: " + requestBase);
+        this._log('ProcessData request body: ' + requestBase);
         return requestBase;
     },
 
