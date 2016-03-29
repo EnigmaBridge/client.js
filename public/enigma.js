@@ -77,7 +77,7 @@ eb.misc = {
         var i = 0;
 
         for(i = 0; i < length; i++){
-            nonce += alphabet.charAt(Math.floor(Math.random() * alphabetLen));
+            nonce += alphabet.charAt(((sjcl.random.randomWords(1)[0]) & 0xffff) % alphabetLen);
         }
 
         return nonce;
@@ -451,7 +451,7 @@ eb.padding.pkcs15 = {
                 curByte = 0xff;
             } else if (bt == 2){
                 do {
-                    curByte = (sjcl.random.randomWords(1, 10)[0]) & 0xff;
+                    curByte = (sjcl.random.randomWords(1)[0]) & 0xff;
                 }while(curByte == 0);
             }
 
