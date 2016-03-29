@@ -2147,3 +2147,412 @@ eb.comm.getPubKey.inheritsFrom(eb.comm.apiRequest, {
     }
 });
 
+/**
+ * HOTP feature.
+ */
+eb.comm.hotp = {
+    // Template for generation of new user context.
+    // USER_AUTH_CTX structure: version 1B | user_id 8B | flags 4B | #total_failed_tries 1B | #max_total_failed_tries 1B | TLV_auth_method1 | ... | TLV_auth_method_n |
+    //               VR    USER-ID-8B     flags   #e #m tt len  |TLV method - HOTP
+    ctxTemplateUsr: '01         %s       00000000 00 04 3f 001d 00 03 1234567812345678 02 08 10 11223344556677881122334455667788',
+
+    // Constants
+    TLV_TYPE_USERAUTHCONTEXT: 0xa3,
+    TLV_TYPE_NEWAUTHCONTEXT: 0xa8,
+    TLV_TYPE_UPDATEAUTHCONTEXT: 0xa7,
+    TLV_TYPE_HOTPCODE: 0xa5,
+    TLV_TYPE_PASSWORDHASH: 0xa4,
+    USERAUTHCTX_MAIN_USERID_LENGTH: 8,
+    USERAUTH_FLAG_HOTP: 0x0001,
+    USER_AUTH_TYPE_HOTP: 63,
+    USERAUTH_FLAG_PASSWD: 0x0002,
+    USER_AUTH_TYPE_PASSWD: 64,
+    USERAUTH_FLAG_GLOBALTRIES: 0x0004,
+    USER_AUTH_TYPE_GLOBALTRIES: 62,
+
+    /**
+     * Returns HOTPCTX template with prefilled user id.
+     * @param usr, hex coded user id, 8B.
+     * @returns {*}
+     */
+    getCtxTemplateUsr: function(usr){
+        return sjcl.codec.hex.toBits(sprintf(this.ctxTemplateUsr, usr).replace(/ /g,''));
+    },
+
+    /**
+     * Encrypts HOTP CTX template with random key & MACs with random key to obtain encrypted
+     * template blob. Required for new user HOTPCTX init.
+     *
+     * @param tpl
+     * @returns {*}
+     */
+    prepareUserContext: function(tpl){
+        var randomEncKey = sjcl.random.randomWords(8);
+        var randomMacKey = sjcl.random.randomWords(8);
+
+        var aes = new sjcl.cipher.aes(randomEncKey);
+        var aesMac = new sjcl.cipher.aes(randomMacKey);
+        var hmac = new sjcl.misc.hmac_cbc(aesMac, 16, eb.padding.empty);
+
+        // IV is null, nonce in the first block is kind of IV.
+        var IV = sjcl.codec.hex.toBits('00'.repeat(16));
+        var encryptedData = sjcl.mode.cbc.encrypt(aes, tpl, IV, [], true);
+        var hmacData = hmac.mac(encryptedData);
+
+        return sjcl.bitArray.concat(encryptedData, hmacData);
+    },
+
+    /**
+     * HOTP general response constructor.
+     * @extends eb.comm.response
+     */
+    hotpResponse: function(){
+
+    },
+
+    /**
+     * General HOTP response parser constructor.
+     */
+    generalHotpParser: function(){
+
+    },
+
+    /**
+     * New HOTPCTX request builder constructor.
+     * @param usr - hex coded user ID, 8bytes.
+     */
+    newHotpUserRequestBuilder: function(usr){
+        this.userId = usr || undefined;
+    },
+
+    /**
+     * New HOTPCTX response parser constructor.
+     */
+    newHotpUserResponseParser: function(){
+
+    },
+
+    /**
+     * HOTP user authentication request builder constructor.
+     */
+    hotpUserAuthRequestBuilder: function(){
+
+    },
+
+    /**
+     * HOTP user authentication response parser constructor.
+     */
+    hotpUserAuthResponseParser: function(){
+
+    },
+
+    /**
+     * Convenience function for building new hotp context request.
+     * @param usr
+     */
+    getNewUserRequest: function(usr){
+        var builder = new eb.comm.hotp.newHotpUserRequestBuilder(usr);
+        return builder.build();
+    },
+
+    /**
+     * Convenience function for building HOTP auth request.
+     * @param usr hex coded user ID, 8B.
+     * @param authCode hex coded auth code.
+     * @param userCtx user context, bitArray.
+     * @param method auth operation to perform, default=TLV_TYPE_HOTPCODE
+     */
+    getUserAuthRequest: function(usr, authCode, userCtx, method){
+        var builder = new eb.comm.hotp.hotpUserAuthRequestBuilder(usr);
+        return builder.build({
+            userId: usr,
+            authCode: authCode,
+            userCtx: userCtx,
+            authOperation: method || eb.comm.hotp.TLV_TYPE_HOTPCODE
+        });
+    }
+
+};
+eb.comm.hotp.hotpResponse.inheritsFrom(eb.comm.response, {
+    userCtx: undefined,
+    userId: undefined,
+    hotpKey: undefined,
+    hotpStatus: undefined,
+
+    toString: function(){
+        return sprintf("HOTPResponse{hotpStatus=0x%4X, userId: %s, hotpKeyLen: %s, UserCtx: %s, sub:{%s}}",
+            this.hotpStatus,
+            sjcl.codec.hex.fromBits(this.userId),
+            sjcl.bitArray.bitLength(this.hotpKey),
+            sjcl.codec.hex.fromBits(userCtx),
+            eb.comm.hotp.hotpResponse.superclass.toString.call(this)
+        );
+    }
+});
+eb.comm.hotp.newHotpUserRequestBuilder.inheritsFrom(eb.comm.base, {
+    userId: undefined,
+    /**
+     * New HOTCTX request builder.
+     * @param options
+     *      userId - hex coded user ID, 8B. If undefined, this.userId is used.
+     * @returns {*}
+     */
+    build: function(options){
+        // ref: performCreateNewAuthCtx
+        // Options.
+        var defaults = {
+            userId: undefined
+        };
+        options = $.extend(defaults, options || {});
+        var userId = options && options.userId;
+        this.userId = userId || this.userId;
+        if (!this.userId){
+            throw new eb.exception.invalid("User ID is undefined");
+        }
+
+        var ba = sjcl.bitArray;
+        var hex = sjcl.codec.hex;
+
+        // Part 1 - auth context, encrypt with random password, template.
+        var tpl = eb.comm.hotp.getCtxTemplateUsr(this.userId);
+        var userAuthCtxPrepared = eb.comm.hotp.prepareUserContext(tpl);
+
+        // Part 2 - auth context, unprotected
+        var userAuthCtxUserID = ""; // extract from template
+        var userAuthCtxUserIDBits = hex.toBits(userAuthCtxUserID);
+        var userAuthCtxBits = ba.concat(userAuthCtxUserIDBits, tpl);
+
+        var request = hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT));
+        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(userAuthCtxPrepared)/8)));
+        request = ba.concat(request, userAuthCtxPrepared);
+
+        request = ba.concat(request, hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_NEWAUTHCONTEXT)));
+        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(userAuthCtxBits)/8)));
+        request = ba.concat(request, userAuthCtxBits);
+
+        return request;
+    }
+});
+eb.comm.hotp.hotpUserAuthRequestBuilder.inheritsFrom(eb.comm.base, {
+    /**
+     * Auth request builder.
+     * @param options
+     *      authCode: hex coded auth code.
+     *      userId: hex coded user ID, 8B.
+     *      userCtx: user context, bitArray.
+     *      authOperation: auth operation to perform, default=TLV_TYPE_HOTPCODE
+     * @returns {*}
+     */
+    build: function(options){
+        // ref: performTestUserAuthVerification
+        var ba = sjcl.bitArray;
+        var hex = sjcl.codec.hex;
+
+        // Options.
+        var defaults = {
+            authCode: undefined,
+            userId: undefined,
+            userCtx: undefined,
+            authOperation: eb.comm.hotp.TLV_TYPE_HOTPCODE
+        };
+        options = $.extend(defaults, options || {});
+        var userId = options && options.userId;
+        var authCode = options && options.authCode;
+        var userCtx = options && options.userCtx;
+        var authOperation = options && options.authOperation;
+        if (!userId || !hotpCode || !userCtx){
+            throw new eb.exception.invalid("User ID / HOTP / userCtx code undefined");
+        }
+
+        var tlvOp, methods;
+        if (authOperation == eb.comm.hotp.TLV_TYPE_HOTPCODE){
+            tlvOp = eb.comm.hotp.TLV_TYPE_HOTPCODE;
+            methods = eb.comm.hotp.USERAUTH_FLAG_HOTP;
+        } else if (authOperation == eb.comm.hotp.TLV_TYPE_PASSWORDHASH){
+            tlvOp = eb.comm.hotp.TLV_TYPE_PASSWORDHASH;
+            methods = eb.comm.hotp.USERAUTH_FLAG_PASSWD;
+        } else {
+            throw new eb.exception.invalid("Unrecognized authentication method");
+        }
+
+        var verificationCode = userId + authCode;
+        var verificationCodeBits = hex.toBits(verificationCode);
+
+        var request = hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT));
+        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(userCtx)/8)));
+        request = ba.concat(request, userCtx);
+
+        request = ba.concat(request, hex.toBits(sprintf("%02x", tlvOp)));
+        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(verificationCodeBits)/8)));
+        request = ba.concat(request, verificationCodeBits);
+
+        return request;
+    }
+});
+eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
+    response: undefined,
+
+    /**
+     * General parsing routine for HOTP responses.
+     *
+     * @param data
+     * @param options
+     *      tlvOp: HOTP operation to expect
+     *      methods: auth methods to parse from the response (default=0)
+     *      bIsLocalCtxUpdate: if set to YES, ctx is updated (default=YES)
+     *      userId: user ID to match against response user ID (default=undefined, no matching)
+     *      response: response to fill in with parsed data. (default=undefined, new one is created)
+     *
+     * @returns {*|eb.comm.response|null|request|number|Object}
+     */
+    parse: function(data, options){
+        var ba = sjcl.bitArray;
+        var offset = 0;
+
+        // Options.
+        var defaults = {
+            tlvOp: eb.comm.hotp.TLV_TYPE_NEWAUTHCONTEXT,
+            methods: 0x0,
+            bIsLocalCtxUpdate: true,
+            userId: undefined,
+            response: undefined
+        };
+
+        options = $.extend(defaults, options || {});
+        var tlvOp = options && options.tlvOp;
+        var methods = options && options.methods;
+        var bIsLocalCtxUpdate = options && options.bIsLocalCtxUpdate;
+        var givenUserId = options && options.userId;
+        var response = options && options.response;
+        if (!response){
+            response = new eb.comm.hotp.hotpResponse();
+        }
+        this.response = response;
+
+        // Check plaintext lenght, should be zero.
+        var plainLen = ba.extract(data, offset, 16);
+        offset += 16;
+        if (plainLen != 0){
+            throw new eb.exception.corrupt("Non-null plain length in new HOTPCTX");
+        }
+
+        // Check main tag value.
+        var tag = ba.extract(data, offset, 8);
+        offset += 8;
+        if (tag != eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT){
+            throw new eb.exception.corrupt("Unrecognized TLV tag");
+        }
+
+        // Extract user context.
+        var userCtxLen = ba.extract(data, offset, 16);
+        offset += 16;
+        response.userCtx = ba.bitSlice(dat, offset, offset+userCtxLen*8);
+        offset += userCtxLen*8;
+
+        // Main TLV op type
+        var msgTlv = ba.extract(data, offset, 8);
+        offset += 8;
+        if (tag != tlvOp){
+            throw new eb.exception.corrupt("Main TLV tag does not match");
+        }
+
+        // Response
+        var responseLen = ba.extract(data, offset, 16);
+        offset += 16;
+
+        // User ID
+        var requestUserId = ba.bitSlice(dat, offset, offset+eb.comm.hotp.USERAUTHCTX_MAIN_USERID_LENGTH*8);
+        offset += eb.comm.hotp.USERAUTHCTX_MAIN_USERID_LENGTH*8;
+
+        // Compare set user id.
+        if (givenUserId){
+            if (!ba.equal(givenUserId, requestUserId)){
+                throw new eb.exception.corrupt("User ID mismatch");
+            }
+        }
+        response.userId = requestUserId;
+
+        // Methods
+        var methodTag, dataReturnLen;
+
+        // Method #1
+        if ((methods & eb.comm.hotp.USERAUTH_FLAG_HOTP) > 0){
+            methodTag = ba.extract(data, offset, 8);
+            offset += 8;
+            if (methodTag != eb.comm.hotp.USER_AUTH_TYPE_HOTP){
+                throw new eb.exception.corrupt("Invalid method tag");
+            }
+
+            dataReturnLen = ba.extract(data, offset, 16);
+            offset += 16;
+            if (bIsLocalCtxUpdate){
+                response.hotpKey = ba.bitSlice(data, offset, offset+dataReturnLen*8);
+
+            } else if (dataReturnLen != 0) {
+                throw new eb.exception.corrupt("Should not contain data");
+            }
+
+            offset += dataReturnLen*8;
+        }
+
+        // Method #2
+        if ((methods & eb.comm.hotp.USERAUTH_FLAG_PASSWD) > 0){
+            methodTag = ba.extract(data, offset, 8);
+            offset += 8;
+            if (methodTag != eb.comm.hotp.USER_AUTH_TYPE_PASSWD){
+                throw new eb.exception.corrupt("Invalid method tag");
+            }
+
+            dataReturnLen = ba.extract(data, offset, 16);
+            offset += 16;
+            if (dataReturnLen != 0) {
+                throw new eb.exception.corrupt("Should not contain data");
+            }
+        }
+
+        // Method #3
+        if ((methods & eb.comm.hotp.USERAUTH_FLAG_GLOBALTRIES) > 0){
+            methodTag = ba.extract(data, offset, 8);
+            offset += 8;
+            if (methodTag != eb.comm.hotp.USER_AUTH_TYPE_GLOBALTRIES){
+                throw new eb.exception.corrupt("Invalid method tag");
+            }
+
+            dataReturnLen = ba.extract(data, offset, 16);
+            offset += 16;
+            if (dataReturnLen != 0) {
+                throw new eb.exception.corrupt("Should not contain data");
+            }
+        }
+
+        if ((offset + 16) != ba.bitLength(data)){
+            throw new eb.exception.corrupt("Data length invalid");
+        }
+
+        response.status = ba.extract(data, offset, 16);
+        offset += 16;
+
+        return response;
+    }
+});
+eb.comm.hotp.newHotpUserResponseParser.inheritsFrom(eb.comm.hotp.generalHotpParser, {
+    parse: function(data, options){
+        options = options || {};
+        options.tlvOp = eb.comm.hotp.TLV_TYPE_NEWAUTHCONTEXT;
+        options.methods = eb.comm.hotp.USERAUTH_FLAG_HOTP;
+        options.bIsLocalCtxUpdate = true;
+        options.userId = undefined;
+
+        return eb.comm.hotp.newHotpUserResponseParser.superclass.parse.call(this, data, options);
+    }
+});
+eb.comm.hotp.hotpUserAuthResponseParser.inheritsFrom(eb.comm.hotp.generalHotpParser, {
+    parse: function(data, options){
+        options = options || {};
+        options.tlvOp = eb.comm.hotp.TLV_TYPE_HOTPCODE;
+        options.methods = eb.comm.hotp.USERAUTH_FLAG_HOTP;
+        options.bIsLocalCtxUpdate = false;
+
+        return eb.comm.hotp.newHotpUserResponseParser.superclass.parse.call(this, data, options);
+    }
+});
