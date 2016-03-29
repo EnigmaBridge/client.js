@@ -2211,6 +2211,7 @@ eb.comm.hotp = {
      *
      * @param hotpCode numeric authentication code coded as string in decimal.
      * @param length HOTP code length. Default = 8. Usually 6,8,10,12
+     * @ref: intToExpandedShortByteArray()
      */
     hotpCodeToHexCoded: function(hotpCode, length){
         length = length || 8;
