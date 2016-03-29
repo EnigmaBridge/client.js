@@ -2203,6 +2203,30 @@ eb.comm.hotp = {
     },
 
     /**
+     * Converts HOTP number given as string to hex-coded array.
+     * Used when authenticating via HOTP code.
+     *
+     * Warning: does not perform radix change. 12345678 -> d2h(12)|d2h(34)|d2h(56)|d2h(78) = 0c22384e
+     * d2h(12345678) = 0BC614E
+     *
+     * @param hotpCode numeric authentication code coded as string in decimal.
+     * @param length HOTP code length. Default = 8. Usually 6,8,10,12
+     */
+    hotpCodeToHexCoded: function(hotpCode, length){
+        length = length || 8;
+        var inputCode = "000000000000000000000000000" + hotpCode;
+        var i,idx,cur,curNum,codeLength = inputCode.length;
+        var result = "";
+        for(i=0; i<length/2; i++){
+            idx = codeLength-(i+1)*2;
+            cur = inputCode.substring(idx, idx + 2);
+            curNum = parseInt(cur, 10);
+            result = sprintf("%02X", curNum) + result;
+        }
+        return result;
+    },
+
+    /**
      * HOTP general response constructor.
      * @extends eb.comm.response
      */
