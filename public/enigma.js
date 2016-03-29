@@ -690,6 +690,37 @@ eb.comm = {
         c = (nonce.slice(i, i + 1)[0] - sub) >>> rbl;
         output.splice(i, 0, c);
         return sjcl.bitArray.clamp(output, bl);
+    },
+
+    base: function(){
+
+    }
+};
+eb.comm.base.prototype = {
+    /**
+     * If set to true, request body building steps are logged.
+     * @input
+     */
+    debuggingLog: false,
+
+    /**
+     * Aux logging function
+     * @input
+     */
+    logger: null,
+
+    _log:  function(x) {
+        if (!this.debuggingLog){
+            return;
+        }
+
+        if (console && console.log){
+            console.log(x);
+        }
+
+        if (this.logger){
+            this.logger(x);
+        }
     }
 };
 
