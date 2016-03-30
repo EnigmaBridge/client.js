@@ -2256,6 +2256,85 @@ eb.comm.hotp = {
     },
 
     /**
+     * Function used to normalize user ID bitArray representation - 2 words width.
+     * @param x
+     */
+    userIdBitsNormalize: function(x){
+        var ln = x.length;
+        if (ln == 2){
+            return x;
+        } else if (ln == 0){
+            return [0,0];
+        } else if (ln == 1){
+            return [0, x[0]];
+        } else {
+            return [x[0], x[1]];
+        }
+    },
+
+    /**
+     * Converts user id argument to the 64bit SJCL bitArray.
+     * @param x
+     *      if x is a number, it is converted to SJCL bitArray. Warning, 32bit numbers are supported only.
+     *      if x is a string, it is considered as hex coded string.
+     *      if x is an array it is considered as SJCL bitArray.
+     */
+    userIdToBits: function(x){
+        var ln;
+        if (typeof(x) === 'number'){
+            return eb.comm.hotp.userIdBitsNormalize(sjcl.codec.hex.toBits(sprintf("%x", x)));
+
+        } else if (typeof(x) === 'string') {
+            x = x.trim();
+            ln = x.length;
+            if (ln > 16 || ln === 0 || !(x.match(/^[0-9A-Fa-f]+$/))){
+                throw eb.exception.invalid("User ID string invalid");
+            }
+
+            return eb.comm.hotp.userIdBitsNormalize(sjcl.codec.hex.toBits(x));
+
+        } else {
+            return eb.comm.hotp.userIdBitsNormalize(x);
+
+        }
+    },
+
+    /**
+     * Converts user id argument to the hexcoded string coding 8 bytes.
+     * @param x -
+     *      if x is a number, will be converted to a hex string. Warning, 32bit numbers are supported only.
+     *      if x is a string, it is considered as hex coded string. It is padded to 8 bytes.
+     *      if x is an array it is considered as SJCL bitArray.
+     */
+    userIdToHex: function(x){
+        var tmp,ln;
+        if (typeof(x) === 'number'){
+            // number
+            return sprintf("%016x", x);
+
+        } else if (typeof(x) === 'string') {
+            // hex-coded string
+            x = x.trim();
+            ln = x.length;
+            if (ln > 16 || ln === 0 || !(x.match(/^[0-9A-Fa-f]+$/))){
+                throw eb.exception.invalid("User ID string invalid");
+            }
+
+            return ln < 16 ? ('0'.repeat(16-ln)) + x : x;
+
+        } else {
+            // SJCL bitArray
+            tmp = sjcl.codec.hex.fromBits(x);
+            ln = tmp.length;
+            if (ln > 16){
+                throw eb.exception.invalid("User ID string invalid");
+            }
+            return ln < 16 ? ('0'.repeat(16-ln)) + tmp : tmp;
+        }
+    },
+
+
+    /**
      * HOTP general response constructor.
      * @extends eb.comm.response
      */
@@ -2327,15 +2406,30 @@ eb.comm.hotp = {
 
 };
 eb.comm.hotp.hotpResponse.inheritsFrom(eb.comm.processDataResponse, {
+    /**
+     * bitArray with HOTP user context blob.
+     */
     hotpUserCtx: undefined,
+
+    /**
+     * bitArray with UserID from the response.
+     */
     hotpUserId: undefined,
+
+    /**
+     * bitArray with HOTP key returned in new HOTPCTX()
+     */
     hotpKey: undefined,
+
+    /**
+     * Numeric result of the auth ProcessData call.
+     */
     hotpStatus: undefined,
 
     toString: function(){
         return sprintf("HOTPResponse{hotpStatus=0x%4X, userId: %s, hotpKeyLen: %s, UserCtx: %s, sub:{%s}}",
             this.hotpStatus,
-            sjcl.codec.hex.fromBits(this.userId),
+            sjcl.codec.hex.fromBits(eb.comm.hotp.userIdToBits(this.userId)),
             sjcl.bitArray.bitLength(this.hotpKey),
             sjcl.codec.hex.fromBits(userCtx),
             eb.comm.hotp.hotpResponse.superclass.toString.call(this)
@@ -2344,6 +2438,7 @@ eb.comm.hotp.hotpResponse.inheritsFrom(eb.comm.processDataResponse, {
 });
 eb.comm.hotp.newHotpUserRequestBuilder.inheritsFrom(eb.comm.base, {
     userId: undefined,
+
     /**
      * New HOTCTX request builder.
      * @param options
@@ -2367,7 +2462,7 @@ eb.comm.hotp.newHotpUserRequestBuilder.inheritsFrom(eb.comm.base, {
         var hex = sjcl.codec.hex;
 
         // Part 1 - auth context, encrypt with random password, template.
-        var tpl = eb.comm.hotp.getCtxTemplateUsr(this.userId);
+        var tpl = eb.comm.hotp.getCtxTemplateUsr(eb.comm.hotp.userIdToHex(this.userId));
         var userAuthCtxPrepared = eb.comm.hotp.prepareUserContext(tpl);
 
         // Part 2 - auth context, unprotected
@@ -2428,7 +2523,7 @@ eb.comm.hotp.hotpUserAuthRequestBuilder.inheritsFrom(eb.comm.base, {
             throw new eb.exception.invalid("Unrecognized authentication method");
         }
 
-        var verificationCode = userId + authCode;
+        var verificationCode = eb.comm.hotp.userIdToHex(userId) + authCode;
         var verificationCodeBits = hex.toBits(verificationCode);
 
         var request = hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT));
@@ -2524,7 +2619,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
 
         // Compare set user id.
         if (givenUserId){
-            if (!ba.equal(givenUserId, requestUserId)){
+            if (!ba.equal(eb.comm.hotp.userIdToBits(givenUserId), requestUserId)){
                 response.hotpStatus = eb.comm.status.SW_AUTH_MISMATCH_USER_ID;
                 throw new eb.exception.corrupt("User ID mismatch");
             }
