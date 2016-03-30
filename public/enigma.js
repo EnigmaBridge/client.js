@@ -2549,10 +2549,10 @@ eb.comm.hotp = {
 
     /**
      * New HOTPCTX request builder constructor.
-     * @param usr - hex coded user ID, 8bytes.
+     * @param userId - hex coded user ID, 8bytes.
      */
-    newHotpUserRequestBuilder: function(usr){
-        this.userId = usr || undefined;
+    newHotpUserRequestBuilder: function(userId){
+        this.userId = userId || undefined;
     },
 
     /**
@@ -2578,24 +2578,24 @@ eb.comm.hotp = {
 
     /**
      * Convenience function for building new hotp context request.
-     * @param usr
+     * @param userId
      */
-    getNewUserRequest: function(usr){
-        var builder = new eb.comm.hotp.newHotpUserRequestBuilder(usr);
+    getNewUserRequest: function(userId){
+        var builder = new eb.comm.hotp.newHotpUserRequestBuilder(userId);
         return builder.build();
     },
 
     /**
      * Convenience function for building HOTP auth request.
-     * @param usr hex coded user ID, 8B.
+     * @param userId hex coded user ID, 8B.
      * @param authCode hex coded auth code.
      * @param userCtx user context, bitArray.
      * @param method auth operation to perform, default=TLV_TYPE_HOTPCODE
      */
-    getUserAuthRequest: function(usr, authCode, userCtx, method){
+    getUserAuthRequest: function(userId, authCode, userCtx, method){
         var builder = new eb.comm.hotp.hotpUserAuthRequestBuilder(usr);
         return builder.build({
-            userId: usr,
+            userId: userId,
             authCode: authCode,
             userCtx: userCtx,
             authOperation: method || eb.comm.hotp.TLV_TYPE_HOTPCODE
