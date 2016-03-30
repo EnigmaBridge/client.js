@@ -2522,6 +2522,13 @@ eb.comm.hotp = {
     },
 
     /**
+     * User context holder constructor.
+     */
+    hotpUserAuthCtxInfo: function(){
+
+    },
+
+    /**
      * HOTP general response constructor.
      * @extends eb.comm.response
      */
@@ -2592,6 +2599,56 @@ eb.comm.hotp = {
     }
 
 };
+eb.comm.hotp.hotpUserAuthCtxInfo.inheritsFrom(eb.comm.base, {
+    /**
+     * User Auth context blob.
+     * Server parameter.
+     *
+     * Authentication:
+     *  - caller fills in with given user context. EB authenticates against this encrypted blob.
+     *  - after authentication, this blob is updated by the server.
+     *
+     * New HOTPCTX():
+     *  - caller leaves undefined.
+     *  - server generates new user context. Server stores this value.
+     */
+    userCtx: undefined,
+
+    /**
+     * User ID to authenticate / create new HOTPCTX for.
+     * Server parameter.
+     */
+    userID: undefined,
+
+    /**
+     * HOTP key - after new HOTPCTX(), server provides symmetric key for generating HOTP codes.
+     * Used to generate HOTP on the client side. HOTP client is initialized with this value.
+     * Client parameter.
+     *
+     * @output
+     */
+    hotpKey: undefined,
+
+    /**
+     * HOTP counter - counter value to generate HOTP codes on the client side.
+     * Client parameter.
+     *
+     * Should be increased by each successful attempt on the client side.
+     * By default is 0.
+     */
+    hotpCounter: 0,
+
+    /**
+     * HOTP code length. Length of the HOTP code in decimal digits.
+     * Reasonable values: 6,7,8.
+     */
+    hotpCodeLength: undefined,
+
+    /**
+     * Auth password hash.
+     */
+    userPasswdHash: undefined,
+});
 eb.comm.hotp.hotpResponse.inheritsFrom(eb.comm.processDataResponse, {
     /**
      * bitArray with HOTP user context blob.
@@ -2600,6 +2657,7 @@ eb.comm.hotp.hotpResponse.inheritsFrom(eb.comm.processDataResponse, {
 
     /**
      * bitArray with UserID from the response.
+     * Filled in after match from given user ID has been confirmed (if given).
      */
     hotpUserId: undefined,
 
