@@ -2710,6 +2710,6 @@ eb.comm.hotp.hotpUserAuthResponseParser.inheritsFrom(eb.comm.hotp.generalHotpPar
         options.methods = eb.comm.hotp.USERAUTH_FLAG_HOTP;
         options.bIsLocalCtxUpdate = false;
 
-        return eb.comm.hotp.newHotpUserResponseParser.superclass.parse.call(this, data, options);
+        return eb.comm.hotp.hotpUserAuthResponseParser.superclass.parse.call(this, data, options);
     }
 });
