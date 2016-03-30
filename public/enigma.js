@@ -2482,11 +2482,13 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
             response = new eb.comm.hotp.hotpResponse();
         }
         this.response = response;
+        response.hotpStatus = 0x0;
 
         // Check plaintext lenght, should be zero.
         var plainLen = ba.extract(data, offset, 16);
         offset += 16;
         if (plainLen != 0){
+            response.hotpStatus = eb.comm.status.SW_INVALID_TLV_FORMAT;
             throw new eb.exception.corrupt("Non-null plain length in new HOTPCTX");
         }
 
@@ -2494,6 +2496,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         var tag = ba.extract(data, offset, 8);
         offset += 8;
         if (tag != eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT){
+            response.hotpStatus = eb.comm.status.SW_INVALID_TLV_FORMAT;
             throw new eb.exception.corrupt("Unrecognized TLV tag");
         }
 
@@ -2507,6 +2510,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         var msgTlv = ba.extract(data, offset, 8);
         offset += 8;
         if (tag != tlvOp){
+            response.hotpStatus = eb.comm.status.SW_INVALID_TLV_FORMAT;
             throw new eb.exception.corrupt("Main TLV tag does not match");
         }
 
@@ -2521,6 +2525,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         // Compare set user id.
         if (givenUserId){
             if (!ba.equal(givenUserId, requestUserId)){
+                response.hotpStatus = eb.comm.status.SW_AUTH_MISMATCH_USER_ID;
                 throw new eb.exception.corrupt("User ID mismatch");
             }
         }
@@ -2534,6 +2539,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
             methodTag = ba.extract(data, offset, 8);
             offset += 8;
             if (methodTag != eb.comm.hotp.USER_AUTH_TYPE_HOTP){
+                response.hotpStatus = eb.comm.status.SW_AUTHMETHOD_UNKNOWN;
                 throw new eb.exception.corrupt("Invalid method tag");
             }
 
@@ -2554,6 +2560,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
             methodTag = ba.extract(data, offset, 8);
             offset += 8;
             if (methodTag != eb.comm.hotp.USER_AUTH_TYPE_PASSWD){
+                response.hotpStatus = eb.comm.status.SW_AUTHMETHOD_UNKNOWN;
                 throw new eb.exception.corrupt("Invalid method tag");
             }
 
@@ -2569,6 +2576,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
             methodTag = ba.extract(data, offset, 8);
             offset += 8;
             if (methodTag != eb.comm.hotp.USER_AUTH_TYPE_GLOBALTRIES){
+                response.hotpStatus = eb.comm.status.SW_AUTHMETHOD_UNKNOWN;
                 throw new eb.exception.corrupt("Invalid method tag");
             }
 
