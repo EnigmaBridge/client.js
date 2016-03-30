@@ -848,6 +848,10 @@ eb.comm = {
         SW_STAT_INVALID_APIKEY:         0x8000 | 0x068,
 
         SW_STAT_OK:                     0x9000,
+
+        PDATA_FAIL_CONNECTION:          0x1,
+        PDATA_FAIL_RESPONSE_PARSING:    0x3,
+        PDATA_FAIL_RESPONSE_FAILED:     0x2,
     },
 
     /**
@@ -1698,7 +1702,7 @@ eb.comm.connector.prototype = {
 
             ebc.processFail(jqXHR, textStatus, errorThrown);
             if (ebc._failCallback) {
-                ebc._failCallback(0x1, jqXHR, textStatus, errorThrown, ebc);
+                ebc._failCallback(eb.comm.status.PDATA_FAIL_CONNECTION, jqXHR, textStatus, errorThrown, ebc);
             }
 
         }).always(function (data, textStatus, jqXHR) {
@@ -1743,14 +1747,14 @@ eb.comm.connector.prototype = {
             } else {
                 this._log("Failure, status: " + this.response.toString());
                 if (this._failCallback){
-                    this._failCallback(0x2, jqXHR, textStatus, this.response, this);
+                    this._failCallback(eb.comm.status.PDATA_FAIL_RESPONSE_FAILED, jqXHR, textStatus, this.response, this);
                 }
             }
 
         } catch(e){
             this._log("Exception when processing the response: " + e);
             if (this._failCallback){
-                this._failCallback(0x3, jqXHR, textStatus, e, this);
+                this._failCallback(eb.comm.status.PDATA_FAIL_RESPONSE_PARSING, jqXHR, textStatus, e, this);
             }
 
             throw e;
