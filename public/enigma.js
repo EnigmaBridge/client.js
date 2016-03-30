@@ -2326,9 +2326,9 @@ eb.comm.hotp = {
     }
 
 };
-eb.comm.hotp.hotpResponse.inheritsFrom(eb.comm.response, {
-    userCtx: undefined,
-    userId: undefined,
+eb.comm.hotp.hotpResponse.inheritsFrom(eb.comm.processDataResponse, {
+    hotpUserCtx: undefined,
+    hotpUserId: undefined,
     hotpKey: undefined,
     hotpStatus: undefined,
 
@@ -2390,7 +2390,7 @@ eb.comm.hotp.hotpUserAuthRequestBuilder.inheritsFrom(eb.comm.base, {
     /**
      * Auth request builder.
      * @param options
-     *      authCode: hex coded auth code.
+     *      authCode: hex coded auth code. In case of HOTP, it should be the output of hotpCodeToHexCoded()
      *      userId: hex coded user ID, 8B.
      *      userCtx: user context, bitArray.
      *      authOperation: auth operation to perform, default=TLV_TYPE_HOTPCODE
@@ -2413,7 +2413,7 @@ eb.comm.hotp.hotpUserAuthRequestBuilder.inheritsFrom(eb.comm.base, {
         var authCode = options && options.authCode;
         var userCtx = options && options.userCtx;
         var authOperation = options && options.authOperation;
-        if (!userId || !hotpCode || !userCtx){
+        if (!userId || !authCode || !userCtx){
             throw new eb.exception.invalid("User ID / HOTP / userCtx code undefined");
         }
 
@@ -2459,6 +2459,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
      * @returns {*|eb.comm.response|null|request|number|Object}
      */
     parse: function(data, options){
+        // ref: processUserAuthResponse
         var ba = sjcl.bitArray;
         var offset = 0;
 
@@ -2499,7 +2500,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         // Extract user context.
         var userCtxLen = ba.extract(data, offset, 16);
         offset += 16;
-        response.userCtx = ba.bitSlice(dat, offset, offset+userCtxLen*8);
+        response.hotpUserCtx = ba.bitSlice(dat, offset, offset+userCtxLen*8);
         offset += userCtxLen*8;
 
         // Main TLV op type
@@ -2523,7 +2524,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
                 throw new eb.exception.corrupt("User ID mismatch");
             }
         }
-        response.userId = requestUserId;
+        response.hotpUserId = requestUserId;
 
         // Methods
         var methodTag, dataReturnLen;
@@ -2582,7 +2583,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
             throw new eb.exception.corrupt("Data length invalid");
         }
 
-        response.status = ba.extract(data, offset, 16);
+        response.hotpStatus = ba.extract(data, offset, 16);
         offset += 16;
 
         return response;
