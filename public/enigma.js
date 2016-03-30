@@ -668,6 +668,31 @@ sjcl.mode.cbc = {
  */
 eb.comm = {
     name: "comm",
+
+    /**
+     * General status constants.
+     */
+    status: {
+        ERROR_CLASS_SECURITY:           0x2000,
+        SW_AUTH_MISMATCH_USER_ID:       0x2000 | 0x0b6,
+        SW_AUTHMETHOD_UNKNOWN:          0x2000 | 0x0ba,
+
+        ERROR_CLASS_WRONGDATA:          0x8000,
+        SW_INVALID_TLV_FORMAT:          0x8000 | 0x04c,
+        SW_WRONG_PADDING:               0x8000 | 0x03d,
+        SW_HOTP_KEY_WRONG_LENGTH:       0x8000 | 0x056,
+        SW_HOTP_TOO_MANY_FAILED_TRIES:  0x8000 | 0x066,
+        SW_STAT_INVALID_APIKEY:         0x8000 | 0x068,
+
+        SW_STAT_OK:                     0x9000,
+    },
+
+    /**
+     * Converts mangled nonce value to the original one in ProcessData response.
+     * ProcessData response has nonce return value response_nonce[i] = request_nonce[i] + 0x1
+     * @param nonce
+     * @returns {*}
+     */
     demangleNonce: function(nonce){
         var ba = sjcl.bitArray;
         var bl = ba.bitLength(nonce);
@@ -692,6 +717,9 @@ eb.comm = {
         return sjcl.bitArray.clamp(output, bl);
     },
 
+    /**
+     * Base class constructor.
+     */
     base: function(){
 
     }
@@ -910,7 +938,7 @@ eb.comm.response.prototype = {
      * @returns {boolean}
      */
     isCodeOk: function(){
-        return this.statusCode == 0x9000;
+        return this.statusCode == eb.comm.status.SW_STAT_OK;
     },
 
     toString: function(){
