@@ -41,6 +41,103 @@ Function.prototype.inheritsFrom = function( parentClassOrObject, newPrototype ){
 };
 
 /**
+ * Missing SHA1 implementation.
+ * It is deprecated, but we need it for HOTP.
+ * @param a
+ */
+sjcl.hash.sha1 = function(a) {
+    if (a) {
+        this._h = a._h.slice(0);
+        this._buffer = a._buffer.slice(0);
+        this._length = a._length
+    } else {
+        this.reset()
+    }
+};
+sjcl.hash.sha1.hash = function(a) {
+    return (new sjcl.hash.sha1()).update(a).finalize()
+};
+sjcl.hash.sha1.prototype = {
+    blockSize: 512,
+    reset: function() {
+        this._h = this._init.slice(0);
+        this._buffer = [];
+        this._length = 0;
+        return this
+    },
+    update: function(f) {
+        if (typeof f === "string") {
+            f = sjcl.codec.utf8String.toBits(f)
+        }
+        var e, a = this._buffer = sjcl.bitArray.concat(this._buffer, f), d = this._length, c = this._length = d + sjcl.bitArray.bitLength(f);
+        for (e = this.blockSize + d & -this.blockSize; e <= c; e += this.blockSize) {
+            this._block(a.splice(0, 16))
+        }
+        return this
+    },
+    finalize: function() {
+        var c, a = this._buffer, d = this._h;
+        a = sjcl.bitArray.concat(a, [sjcl.bitArray.partial(1, 1)]);
+        for (c = a.length + 2; c & 15; c++) {
+            a.push(0)
+        }
+        a.push(Math.floor(this._length / 4294967296));
+        a.push(this._length | 0);
+        while (a.length) {
+            this._block(a.splice(0, 16))
+        }
+        this.reset();
+        return d
+    },
+    _init: [1732584193, 4023233417, 2562383102, 271733878, 3285377520],
+    _key: [1518500249, 1859775393, 2400959708, 3395469782],
+    _f: function(e, a, g, f) {
+        if (e <= 19) {
+            return (a & g) | (~a & f)
+        } else {
+            if (e <= 39) {
+                return a ^ g ^ f
+            } else {
+                if (e <= 59) {
+                    return (a & g) | (a & f) | (g & f)
+                } else {
+                    if (e <= 79) {
+                        return a ^ g ^ f
+                    }
+                }
+            }
+        }
+    },
+    _S: function(b, a) {
+        return (a << b) | (a >>> 32 - b)
+    },
+    _block: function(n) {
+        var r, g, p, o, m, l, j, q = n.slice(0), i = this._h, f = this._key;
+        p = i[0];
+        o = i[1];
+        m = i[2];
+        l = i[3];
+        j = i[4];
+        for (r = 0; r <= 79; r++) {
+            if (r >= 16) {
+                q[r] = this._S(1, q[r - 3] ^ q[r - 8] ^ q[r - 14] ^ q[r - 16])
+            }
+            g = (this._S(5, p) + this._f(r, o, m, l) + j + q[r] + this._key[Math.floor(r / 20)]) | 0;
+            j = l;
+            l = m;
+            m = this._S(30, o);
+            o = p;
+            p = g
+        }
+        i[0] = (i[0] + p) | 0;
+        i[1] = (i[1] + o) | 0;
+        i[2] = (i[2] + m) | 0;
+        i[3] = (i[3] + l) | 0;
+        i[4] = (i[4] + j) | 0
+    }
+};
+
+/**
  * Base EB package.
  * @type {{name: string}}
  */
@@ -98,7 +195,60 @@ eb.misc = {
             }
         }
         return dst;
-    }
+    },
+
+    /**
+     * Converts argument to the SJCL bitArray.
+     * @param x
+     *      if x is a number, it is converted to SJCL bitArray. Warning, 32bit numbers are supported only.
+     *      if x is a string, it is considered as hex coded string.
+     *      if x is an array it is considered as SJCL bitArray.
+     * @returns {*}
+     */
+    inputToBits: function(x){
+        var ln;
+        if (typeof(x) === 'number'){
+            return sjcl.codec.hex.toBits(sprintf("%x", x));
+
+        } else if (typeof(x) === 'string') {
+            x = x.trim();
+            if (!(x.match(/^[0-9A-Fa-f]+$/))){
+                throw eb.exception.invalid("Invalid hex coded number");
+            }
+
+            return sjcl.codec.hex.toBits(x);
+
+        } else {
+            return x;
+
+        }
+    },
+
+    /**
+     * Converts argument to the hexcoded string.
+     * @param x -
+     *      if x is a number, will be converted to a hex string. Warning, 32bit numbers are supported only.
+     *      if x is a string, it is considered as hex coded string.
+     *      if x is an array it is considered as SJCL bitArray.
+     */
+    inputToHex: function(x){
+        var tmp,ln;
+        if (typeof(x) === 'number'){
+            return sprintf("%x", x);
+
+        } else if (typeof(x) === 'string') {
+            x = x.trim();
+            if (!(x.match(/^[0-9A-Fa-f]+$/))){
+                throw eb.exception.invalid("Invalid hex coded number");
+            }
+
+            return x;
+
+        } else {
+            return sjcl.codec.hex.fromBits(x);
+
+        }
+    },
 };
 
 eb.codec = {};
@@ -2334,6 +2484,42 @@ eb.comm.hotp = {
         }
     },
 
+    /**
+     * Utility function to compute HOTP value, returned as string coded in decimal base.
+     * @see https://tools.ietf.org/html/rfc4226
+     * @param key           bitArray key | hexcoded key
+     * @param ctr           8byte HOTP counter. bitArray or hexcoded string or numeric
+     * @param length        length of the HOTP code.
+     */
+    hotpCompute: function(key, ctr, length){
+        var hmac = new sjcl.misc.hmac(eb.misc.inputToBits(key), sjcl.hash.sha1);
+
+        // Ctr is 8 byte coutner, big endian coded. Make sure it has correct length.
+        var ctrBits = eb.misc.inputToBits(ctr);
+        var ctrHex = eb.misc.inputToHex(ctr).trim();
+        var ctrHexLn = ctrHex.length;
+        if (ctrHexLn > 16){
+            throw eb.exception.invalid("Counter value is too big");
+
+        } else if (ctrHexLn < 16){
+            ctrHex = ('0'.repeat(16-ctrHexLn)) + ctrHex;
+            ctrBits = sjcl.codec.hex.toBits(ctrHex);
+        }
+
+        // 1. step, compute HMAC.
+        var hs = hmac.mac(ctrBits);
+
+        // 2. dynamic truncation. hs has 160 bits, take lower 4.
+        // 0 <= offSet <= 15
+        var offset = sjcl.bitArray.extract(hs, 156, 4) & 0xf;
+
+        // Take low 31 bits from hs[offset]..hs[offset+3]
+        // 3. Convert to a number.
+        var snum = sjcl.bitArray.extract(hs, offset*8+1, 31);
+
+        // 4. mod length. 31 bit => maximum length is 8. 9 makes no real sense.
+        return snum % (Math.pow(10, length));
+    },
 
     /**
      * HOTP general response constructor.
