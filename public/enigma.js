@@ -675,6 +675,7 @@ eb.comm = {
     status: {
         ERROR_CLASS_SECURITY:           0x2000,
         SW_AUTH_MISMATCH_USER_ID:       0x2000 | 0x0b6,
+        SW_AUTH_TOO_MANY_FAILED_TRIES:  0x2000 | 0x0b1,
         SW_AUTHMETHOD_UNKNOWN:          0x2000 | 0x0ba,
 
         ERROR_CLASS_WRONGDATA:          0x8000,
@@ -2431,7 +2432,7 @@ eb.comm.hotp.hotpResponse.inheritsFrom(eb.comm.processDataResponse, {
             this.hotpStatus,
             sjcl.codec.hex.fromBits(eb.comm.hotp.userIdToBits(this.userId)),
             sjcl.bitArray.bitLength(this.hotpKey),
-            sjcl.codec.hex.fromBits(userCtx),
+            sjcl.codec.hex.fromBits(this.hotpUserCtx),
             eb.comm.hotp.hotpResponse.superclass.toString.call(this)
         );
     }
