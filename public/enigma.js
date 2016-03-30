@@ -1341,10 +1341,13 @@ eb.comm.responseParser.prototype = {
      * Parse EB response
      *
      * @param data - json response
+     * @param resp - response object to put data to.
      * @returns request unwrapped response.
      */
-    parse: function(data){
-        var resp = this.response = new eb.comm.response();
+    parse: function(data, resp){
+        resp = resp || this.response;
+        resp = resp || new eb.comm.response();
+        this.response = resp;
         this.parseCommonHeaders(resp, data);
 
         // Build new response message.
@@ -1412,10 +1415,14 @@ eb.comm.processDataResponseParser.inheritsFrom(eb.comm.responseParser, {
      * Parse EB response
      *
      * @param data - json response
+     * @param resp - response object to put data to.
      * @returns request unwrapped response.
      */
-    parse: function(data){
-        var resp = this.response = new eb.comm.processDataResponse();
+    parse: function(data, resp){
+        resp = resp || this.response;
+        resp = resp || new eb.comm.processDataResponse();
+        this.response = resp;
+
         this.parseCommonHeaders(resp, data);
         if (!this.success()){
             this._log("Error in processing, status: " + data.status + ", message: " + resp.statusDetail);
@@ -1733,11 +1740,9 @@ eb.comm.connector.prototype = {
     processAnswer: function(data, textStatus, jqXHR){
         this.rawResponse = data;
         try {
-            var h = sjcl.codec.hex;
-
-            // Build a new EB request.
             var responseParser = this.getResponseParser();
-            this.response = responseParser.parse(data);
+            this.response = this.getResponseObject();
+            this.response = responseParser.parse(data, this.response);
 
             if (responseParser.success()) {
                 this._log("Processing complete, response: " + this.response.toString());
@@ -1851,6 +1856,14 @@ eb.comm.connector.prototype = {
         this.responseParser.debuggingLog = true;
         this.responseParser.logger = this.logger;
         return this.responseParser;
+    },
+
+    /**
+     * Returns respone object to be used by the response parser.
+     * Enables to specify a subclass of the original response class.
+     */
+    getResponseObject: function(){
+        return new eb.comm.response();
     },
 
     /**
