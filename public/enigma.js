@@ -202,9 +202,11 @@ eb.misc = {
         }
         return dst;
     },
-    absorbValue: function(dst, value, valueKey){
+    absorbValue: function(dst, value, valueKey, defaultValue){
         if (value !== undefined){
             dst[valueKey] = value;
+        } else if (defaultValue !== undefined){
+            dst[valueKey] = defaultValue;
         }
     },
 
