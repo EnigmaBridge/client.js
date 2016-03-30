@@ -833,6 +833,7 @@ eb.comm = {
         SW_AUTH_MISMATCH_USER_ID:       0x2000 | 0x0b6,
         SW_AUTH_TOO_MANY_FAILED_TRIES:  0x2000 | 0x0b1,
         SW_AUTHMETHOD_UNKNOWN:          0x2000 | 0x0ba,
+        SW_HOTP_COUNTER_OVERFLOW:       0x2000 | 0x0b3,
 
         ERROR_CLASS_WRONGDATA:          0x8000,
         SW_INVALID_TLV_FORMAT:          0x8000 | 0x04c,
@@ -2643,12 +2644,21 @@ eb.comm.hotp.hotpResponse.inheritsFrom(eb.comm.processDataResponse, {
      */
     hotpStatus: undefined,
 
+    /**
+     * If true, whole HOTP response was parsed successfully.
+     * In auth request it indicates context can be updated successfully.
+     * Flag added by the response parser.
+     * If false, exception was probably thrown during parsing.
+     */
+    hotpParsingSuccessful: false,
+
     toString: function(){
-        return sprintf("HOTPResponse{hotpStatus=0x%4X, userId: %s, hotpKeyLen: %s, UserCtx: %s, sub:{%s}}",
+        return sprintf("HOTPResponse{hotpStatus=0x%4X, userId: %s, hotpKeyLen: %s, UserCtx: %s, parsingOk: %s, sub:{%s}}",
             this.hotpStatus,
             sjcl.codec.hex.fromBits(eb.comm.hotp.userIdToBits(this.userId)),
             sjcl.bitArray.bitLength(this.hotpKey),
             sjcl.codec.hex.fromBits(this.hotpUserCtx),
+            this.hotpParsingSuccessful,
             eb.comm.hotp.hotpResponse.superclass.toString.call(this)
         );
     }
@@ -2764,7 +2774,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
      * @param options
      *      tlvOp: HOTP operation to expect
      *      methods: auth methods to parse from the response (default=0)
-     *      bIsLocalCtxUpdate: if set to YES, ctx is updated (default=YES)
+     *      bIsLocalCtxUpdate: if set to YES, hotp key is updated in ctx (default=YES)
      *      userId: user ID to match against response user ID (default=undefined, no matching)
      *      response: response to fill in with parsed data. (default=undefined, new one is created)
      *
@@ -2795,6 +2805,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         }
         this.response = response;
         response.hotpStatus = 0x0;
+        response.hotpParsingSuccessful = false;
 
         // Check plaintext lenght, should be zero.
         var plainLen = ba.extract(data, offset, 16);
@@ -2906,6 +2917,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         response.hotpStatus = ba.extract(data, offset, 16);
         offset += 16;
 
+        response.hotpParsingSuccessful = true;
         return response;
     }
 });
