@@ -2050,7 +2050,7 @@ eb.comm.apiRequest.inheritsFrom(eb.comm.connector, {
                 this.getNonce());
 
         } else if (this.requestMethod == "GET"){
-            return sprintf("%s://%s:%d/%s/%s/%s/%s/%s",
+            return sprintf("%s://%s:%d/%s/%s/%s/%s%s",
                 this.requestScheme,
                 this.remoteEndpoint,
                 this.remotePort,
@@ -2058,7 +2058,7 @@ eb.comm.apiRequest.inheritsFrom(eb.comm.connector, {
                 this._apiKeyReq,
                 this.callFunction,
                 this.getNonce(),
-                JSON.stringify(this.reqBody));
+                this.reqBody !== undefined ? ("/" + JSON.stringify(this.reqBody)) : "");
 
         } else {
             throw new eb.exception.invalid("Invalid configuration, unknown method: " + this.requestMethod);
