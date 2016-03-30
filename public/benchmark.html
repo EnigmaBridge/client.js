@@ -229,13 +229,13 @@
         request.logger = logger;
 
         // Callbacks settings.
-        request.done(function(response, requestObj, jqXHR) {
+        request.done(function(response, requestObj, data) {
             console.log("DONE! " + h.fromBits(response.protectedData));
 
-        }).fail(function(failType, jqXHR, textStatus, errorThrown, requestObj){
+        }).fail(function(failType, data){
             console.log("fail! type=" + failType);
 
-        }).always(function(request){
+        }).always(function(request, data){
             reqTimes.push(request.requestTime);
             if (!parallel_) {
                 fileRequest(userConfig, endpointConfig, logger, plainData, requestData, parallel_);

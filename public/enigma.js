@@ -1592,9 +1592,9 @@ eb.comm.connector.prototype = {
      */
     _socketRequest: "",
 
-    _doneCallback: function(response, requestObj, jqXHR){},
-    _failCallback: function(failType, jqXHR, textStatus, errorThrown, requestObj){},
-    _alwaysCallback: function(requestObj){},
+    _doneCallback: function(response, requestObj, data){},
+    _failCallback: function(failType, data){},
+    _alwaysCallback: function(requestObj, data){},
 
     done: function(x){
         this._doneCallback = x;
@@ -1693,6 +1693,8 @@ eb.comm.connector.prototype = {
                 ebc._requestFinished();
                 ebc._log("Response status: " + textStatus);
                 ebc._log("Raw response: " + JSON.stringify(data));
+
+                // Process AJAX success. By default, response parsing is done. Subclass may modify this behavior.
                 ebc.processAnswer(data, textStatus, jqXHR);
 
             }).fail(function (jqXHR, textStatus, errorThrown) {
@@ -1700,16 +1702,13 @@ eb.comm.connector.prototype = {
             ebc._log("Error: " + sprintf("Error: status=[%d], responseText: [%s], error: [%s], status: [%s] misc: %s",
                     jqXHR.status, jqXHR.responseText, errorThrown, textStatus, JSON.stringify(jqXHR)));
 
+            // Process AJAX fail, subclass can modify behavior, hook something.
             ebc.processFail(jqXHR, textStatus, errorThrown);
-            if (ebc._failCallback) {
-                ebc._failCallback(eb.comm.status.PDATA_FAIL_CONNECTION, jqXHR, textStatus, errorThrown, ebc);
-            }
 
         }).always(function (data, textStatus, jqXHR) {
+            // Process AJAX always, subclass can modify behavior, hook something.
             ebc.processAlways(data, textStatus, jqXHR);
-            if (ebc._alwaysCallback) {
-                ebc._alwaysCallback(ebc);
-            }
+
         });
     },
 
@@ -1741,20 +1740,35 @@ eb.comm.connector.prototype = {
             if (responseParser.success()) {
                 this._log("Processing complete, response: " + this.response.toString());
                 if (this._doneCallback){
-                    this._doneCallback(this.response, this, jqXHR)
+                    this._doneCallback(this.response, this, {
+                        'jqXHR':jqXHR,
+                        'textStatus':textStatus,
+                        'response':this.response,
+                        'requestObj':this
+                    });
                 }
 
             } else {
                 this._log("Failure, status: " + this.response.toString());
                 if (this._failCallback){
-                    this._failCallback(eb.comm.status.PDATA_FAIL_RESPONSE_FAILED, jqXHR, textStatus, this.response, this);
+                    this._failCallback(eb.comm.status.PDATA_FAIL_RESPONSE_FAILED, {
+                        'jqXHR':jqXHR,
+                        'textStatus':textStatus,
+                        'response':this.response,
+                        'requestObj':this
+                    });
                 }
             }
 
         } catch(e){
             this._log("Exception when processing the response: " + e);
             if (this._failCallback){
-                this._failCallback(eb.comm.status.PDATA_FAIL_RESPONSE_PARSING, jqXHR, textStatus, e, this);
+                this._failCallback(eb.comm.status.PDATA_FAIL_RESPONSE_PARSING, {
+                    'jqXHR':jqXHR,
+                    'textStatus':textStatus,
+                    'requestObj':this,
+                    'parseException':e
+                });
             }
 
             throw e;
@@ -1763,22 +1777,40 @@ eb.comm.connector.prototype = {
 
     /**
      * To be overriden.
+     * Called on AJAX fail.
+     *
      * @param jqXHR
      * @param textStatus
      * @param errorThrown
      */
     processFail: function(jqXHR, textStatus, errorThrown){
-
+        if (this._failCallback) {
+            this._failCallback(eb.comm.status.PDATA_FAIL_CONNECTION, {
+                'jqXHR':jqXHR,
+                'textStatus':textStatus,
+                'errorThrown':errorThrown,
+                'requestObj': this
+            });
+        }
     },
 
     /**
      * To be overriden.
+     * Called on AJAX always.
+     *
      * @param data
      * @param textStatus
      * @param jqXHR
      */
     processAlways: function(data, textStatus, jqXHR){
-
+        if (this._alwaysCallback) {
+            this._alwaysCallback(this, {
+                'responseRawData':data,
+                'textStatus':textStatus,
+                'jqXHR':jqXHR,
+                'requestObj': this
+            });
+        }
     },
 
     /**

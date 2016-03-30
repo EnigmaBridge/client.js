@@ -221,13 +221,13 @@
         var request = new eb.comm.getPubKey();
         request.configure(getSettings());
         request.logger = logger;
-        request.done(function(response, requestObj, jqXHR) {
+        request.done(function(response, requestObj, data) {
             console.log("DONE! " + response.toString());
 
-        }).fail(function(failType, jqXHR, textStatus, errorThrown, requestObj){
+        }).fail(function(failType, data){
             console.log("fail! type=" + failType);
 
-        }).always(function(request){
+        }).always(function(request, data){
             console.log("it is over...");
         });
 
@@ -279,13 +279,13 @@
         request.logger = logger;
 
         // Callbacks settings.
-        request.done(function(response, requestObj, jqXHR) {
+        request.done(function(response, requestObj, data) {
             console.log("DONE! " + h.fromBits(response.protectedData));
 
-        }).fail(function(failType, jqXHR, textStatus, errorThrown, requestObj){
+        }).fail(function(failType, data){
             console.log("fail! type=" + failType);
 
-        }).always(function(request){
+        }).always(function(request, data){
             console.log("it is over...");
         });
 
