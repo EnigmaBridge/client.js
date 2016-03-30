@@ -202,6 +202,11 @@ eb.misc = {
         }
         return dst;
     },
+    absorbValue: function(dst, value, valueKey){
+        if (value !== undefined){
+            dst[valueKey] = value;
+        }
+    },
 
     /**
      * Converts argument to the SJCL bitArray.
@@ -880,6 +885,16 @@ eb.comm = {
      */
     base: function(){
 
+    },
+
+    /**
+     * User object constructor
+     */
+    uo: function(uoid, encKey, macKey){
+        var av = eb.misc.absorbValue;
+        av(this, uoid, 'uoid');
+        av(this, encKey, 'encKey');
+        av(this, macKey, 'macKey');
     }
 };
 eb.comm.base.prototype = {
@@ -908,6 +923,22 @@ eb.comm.base.prototype = {
             this.logger(x);
         }
     }
+};
+eb.comm.uo.prototype = {
+    /**
+     * User object ID.
+     */
+    uoid: undefined,
+
+    /**
+     * Encryption communication key.
+     */
+    encKey: undefined,
+
+    /**
+     * MAC communication key.
+     */
+    macKey: undefined,
 };
 
 /**
