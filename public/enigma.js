@@ -196,6 +196,12 @@ eb.misc = {
         }
         return dst;
     },
+    absorbKey: function(dst, src, key){
+        if (key in src){
+            dst[key] = src[key];
+        }
+        return dst;
+    },
 
     /**
      * Converts argument to the SJCL bitArray.
@@ -1589,36 +1595,17 @@ eb.comm.connector.prototype = {
         }
 
         // Advanced connection settings.
-        if ("remoteEndpoint" in configObject){
-            this.remoteEndpoint = configObject.remoteEndpoint;
-        }
-        if ("remotePort" in configObject){
-            this.remotePort = configObject.remotePort;
-        }
-        if ("requestMethod" in configObject){
-            this.requestMethod = configObject.requestMethod;
-        }
-        if ("requestScheme" in configObject){
-            this.requestScheme = configObject.requestScheme;
-        }
-        if ("requestTimeout" in configObject){
-            this.requestTimeout = configObject.requestTimeout;
-        }
-        if ("debuggingLog" in configObject){
-            this.debuggingLog = configObject.debuggingLog;
-        }
-        if ("logger" in configObject){
-            this.logger = configObject.logger;
-        }
-        if ("responseParser" in configObject){
-            this.responseParser = configObject.responseParser;
-        }
-        if ("reqHeader" in configObject){
-            this.reqHeader = configObject.reqHeader;
-        }
-        if ("reqBody" in configObject){
-            this.reqBody = configObject.reqBody;
-        }
+        var ak = eb.misc.absorbKey;
+        ak(this, configObject, "remoteEndpoint");
+        ak(this, configObject, "remotePort");
+        ak(this, configObject, "requestMethod");
+        ak(this, configObject, "requestScheme");
+        ak(this, configObject, "requestTimeout");
+        ak(this, configObject, "debuggingLog");
+        ak(this, configObject, "logger");
+        ak(this, configObject, "responseParser");
+        ak(this, configObject, "reqHeader");
+        ak(this, configObject, "reqBody");
     },
 
     /**
@@ -1954,18 +1941,11 @@ eb.comm.apiRequest.inheritsFrom(eb.comm.connector, {
         eb.comm.apiRequest.superclass.configure.call(this, configObject);
 
         // Configure this.
-        if ("callFunction" in configObject){
-            this.callFunction = configObject.callFunction;
-        }
-        if ("apiKey" in configObject){
-            this.apiKey = configObject.apiKey;
-        }
-        if ("apiKeyLow4Bytes" in configObject){
-            this.apiKeyLow4Bytes = configObject.apiKeyLow4Bytes;
-        }
-        if ("nonce" in configObject){
-            this.nonce = configObject.nonce;
-        }
+        var ak = eb.misc.absorbKey;
+        ak(this, configObject, "callFunction");
+        ak(this, configObject, "apiKey");
+        ak(this, configObject, "apiKeyLow4Bytes");
+        ak(this, configObject, "nonce");
     },
 
     /**
@@ -2114,19 +2094,11 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
         eb.comm.processData.superclass.configure.call(this, toConfig);
 
         // Configure this.
-        if ("aesKey" in configObject){
-            this.aesKey = configObject.aesKey;
-        }
-        if ("macKey" in configObject){
-            this.macKey = configObject.macKey;
-        }
-        if ("userObjectId" in configObject){
-            this.userObjectId = configObject.userObjectId;
-            this.apiKeyLow4Bytes = configObject.userObjectId;
-        }
-        if ("callRequestType" in configObject){
-            this.callRequestType = configObject.callRequestType;
-        }
+        var ak = eb.misc.absorbKey;
+        ak(this, configObject, "aesKey");
+        ak(this, configObject, "macKey");
+        ak(this, configObject, "userObjectId");
+        ak(this, configObject, "callRequestType");
     },
 
     /**
