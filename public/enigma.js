@@ -3212,7 +3212,7 @@ eb.comm.hotp.newHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
      */
     build: function(configObject){
         this._log("Building request body");
-        if ('hotp' in configObject){
+        if (configObject && 'hotp' in configObject){
             this.configureHotp(configObject.hotp);
         }
 
@@ -3277,7 +3277,7 @@ eb.comm.hotp.authHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
      */
     build: function(hotpData){
         this._log("Building request body");
-        if ('hotp' in configObject){
+        if (configObject && 'hotp' in configObject){
             this.configureHotp(configObject.hotp);
         }
 
