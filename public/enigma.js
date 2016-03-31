@@ -2965,14 +2965,10 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         response.hotpParsingSuccessful = false;
         response.hotpShouldUpdateCtx = false;
 
-        // Check plaintext lenght, should be zero.
-        var plainLen = ba.extract(data, offset, 16);
-        offset += 16;
-        if (plainLen != 0){
-            response.hotpStatus = eb.comm.status.SW_INVALID_TLV_FORMAT;
-            throw new eb.exception.corrupt("Non-null plain length in new HOTPCTX");
-        }
-
+        // Check for the plainData length = 0 was here, but protected data does not contain plain data,
+        // it was moved to a different field in the response message so we don't check it here,
+        // while original code in processUserAuthResponse does.
+        
         // Check main tag value.
         var tag = ba.extract(data, offset, 8);
         offset += 8;
