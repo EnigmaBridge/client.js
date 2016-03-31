@@ -2710,8 +2710,8 @@ eb.comm.hotp = {
             label,
             web,
             secret32,
-            issuer ? "&issuer="+issuer : "",
-            ctr ? "&counter="+ctr : "");
+            issuer !== undefined ? "&issuer="+issuer : "",
+            ctr !== undefined ? "&counter="+ctr : "");
     },
 
     /**
