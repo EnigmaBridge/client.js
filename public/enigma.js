@@ -189,6 +189,10 @@ eb.misc = {
         return [x[0]^y[0],x[1]^y[1],x[2]^y[2],x[3]^y[3]];
     },
     absorb: function(dst, src){
+        if (src === undefined){
+            return dst;
+        }
+
         for(var key in src) {
             if (src.hasOwnProperty(key)) {
                 dst[key] = src[key];
@@ -197,7 +201,7 @@ eb.misc = {
         return dst;
     },
     absorbKey: function(dst, src, key){
-        if (key in src){
+        if (src !== undefined && key in src){
             dst[key] = src[key];
         }
         return dst;
