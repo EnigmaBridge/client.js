@@ -224,11 +224,12 @@
         var digits = $('#hotpDigits').val();
         var hotpSecret = $('#hotpSecret').val();
         var hotpSecretBits = sjcl.codec.hex.toBits(hotpSecret);
-        var hotpCtr = parseInt($('#hotpCtr').val());
+        var hotpCtr = $('#hotpCtr').val();
         var hotpCode = eb.comm.hotp.hotpCompute(hotpSecretBits, hotpCtr, digits);
-        var hotpCodeStr = sprintf("%06d", hotpCode);
+        var hotpCodeStr = sprintf("%0"+digits+"d", hotpCode);
 
-        $('#hotpCtr').val(hotpCtr+1);
+        var bn = new sjcl.bn(hotpCtr);
+        $('#hotpCtr').val(bn.addM(1).toString().replace(/^0x/, ''));
         $('#hotpCodeDiv').html(hotpCodeStr);
         $('#hotpCode').val(hotpCodeStr);
     }
