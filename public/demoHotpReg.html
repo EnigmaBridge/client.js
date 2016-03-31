@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Enigma Bridge REST demo</title>
+    <style>
+        body,div,p,a,td,input {font-family: Arial, Helvetica, sans-serif; font-size: 10pt;}
+        h1 {font-size: 14pt; }
+        h2 {font-size: 12pt; }
+        #footer {font-size: 8pt; text-align: center; padding: 0 10px 10px 10px}
+        .logbox {
+            background-color: #2A88AD;
+            padding: 10px 10px 10px 10px;
+            font-family: monospace;
+            margin-top: 10px;
+            margin-right: 10px;
+            color: #f9f9f9;
+            overflow: auto;
+            width: 99%;
+            white-space: pre-wrap;       /* CSS 3 */
+            white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+            white-space: -o-pre-wrap;    /* Opera 7 */
+            word-wrap: break-word;       /* Internet Explorer 5.5+ */}
+    </style>
+    <link href='http://fonts.googleapis.com/css?family=Bitter' rel='stylesheet' type='text/css'/>
+    <link rel="stylesheet" type="text/css" href="forms.css"/>
+    <script src="jquery-1.12.1.min.js"></script>
+    <script src="sprintf.js"></script>
+    <script src="sjcl.js"></script>
+    <script src="enigma.js"></script>
+</head>
+<body>
+
+<!-- form design: http://www.sanwebe.com/2014/08/css-html-forms-designs -->
+<div class="form-style-10">
+    <h1>EnigmaBridge HOTP API test<span>new HOTPCTX() demo</span></h1>
+    <form>
+        <div class="section"><span>1</span>Function input</div>
+        <div class="inner-wrap">
+            <label>
+                User ID
+                <input type="text" name="data" id="data" placeholder="User-id-8B-hex-coded"/>
+                <span>User ID to register to HOTP.
+                </span>
+            </label>
+        </div>
+
+        <div class="section"><span>2</span>Configuration</div>
+        <div class="inner-wrap">
+            <label>API Key
+                <input type="text" name="apiKey" id="apiKey" value="TEST_API"/>
+                <span>Your EB API key</span>
+            </label>
+
+            <label>User object ID
+                <input type="text" name="userObjectID" id="userObjectID" value="8855"/>
+                <span></span>
+            </label>
+
+            <label>ProcessData method
+                <input type="text" name="processDataMethod" id="processDataMethod" value="AUTH_NEWUSERCTX"/>
+                <span>
+                </span>
+            </label>
+
+            <label>Endpoint
+                <input type="text" name="endpoint" id="endpoint" value="site1.enigmabridge.com"/>
+                <span>Hostname of the EB API
+                    <a onclick="$('#endpoint').val('site1.enigmabridge.com');">site1</a>,
+                    <a onclick="$('#endpoint').val('site2.enigmabridge.com');">site2</a></span>
+            </label>
+
+            <label>Method
+                <select id="requestMethod" name="requestMethod">
+                    <option value="POST">POST</option>
+                    <option value="GET">GET</option>
+                </select>
+            </label>
+
+            <label>Scheme
+                <select id="requestScheme" name="requestScheme">
+                    <option value="https">https</option>
+                    <option value="http">http</option>
+                </select>
+            </label>
+
+            <label>AES encryption key
+                <input type="text" name="aesKey" id="aesKey" value="1234567890123456789012345678901234567890123456789012345678901234"/>
+                <span>Hexcoded encryption API key
+                </span>
+            </label>
+
+            <label>MAC key
+                <input type="text" name="macKey" id="macKey" value="2224262820223456789012345678901234567890123456789012345678901234"/>
+                <span>Hexcoded hmac API key
+                </span>
+            </label>
+        </div>
+        <div class="button-section">
+            <input type="button" id="btnRegister" value="Register"/>
+        </div>
+    </form>
+</div>
+
+<label for="reqRest">Request: </label>
+<div id="reqRest" class="logbox"></div>
+<br/>
+
+<label for="status">Log: </label>
+<div id="status" class="logbox"></div>
+
+<script>
+    "use strict";
+    function set_request(msg){
+        $("#reqRest")[0].innerHTML = msg;
+    }
+
+    function display_message(msg) {
+        $("#status")[0].innerHTML = msg;
+    }
+
+    function formatDate(date) {
+        var hours = date.getHours();
+        var minutes = date.getMinutes();
+        var sec = date.getSeconds();
+        var milli = date.getMilliseconds();
+        var strTime = sprintf("%02d:%02d:%02d.%03d", hours, minutes, sec, milli);
+        return date.getMonth()+1 + "/" + date.getDate() + "/" + date.getFullYear() + " " + strTime;
+    }
+
+    function append_message(msg) {
+        var status = $("#status");
+        var newMsg = formatDate(new Date()) + " - " + msg;
+        status.html(status.html() + "<br/>\n" + newMsg);
+    }
+
+    function log(msg){
+        console.log(msg);
+        append_message(msg);
+    }
+
+    /**
+     * Get settings from the form.
+     * @returns {{remoteEndpoint: (*|jQuery), remotePort: number, requestMethod: (*|jQuery), requestScheme: (*|jQuery), requestTimeout: number, debuggingLog: boolean}}
+     */
+    function getSettings(){
+        var apiKey = $('#apiKey').val();
+        var keyId = parseInt($('#userObjectID').val(), 16);
+        var endpoint = $('#endpoint').val();
+        var method = $('#requestMethod').val();
+        var scheme = $('#requestScheme').val();
+
+        return {
+            remoteEndpoint: endpoint,
+            remotePort: 11180,
+            requestMethod: method,
+            requestScheme: scheme,
+            requestTimeout: 7000,
+            debuggingLog: true,
+            apiKey: apiKey,
+            apiKeyLow4Bytes: keyId,
+            userObjectId : keyId
+        };
+    }
+
+    function requestSimple(userId){
+        var h = sjcl.codec.hex;
+        var aesKey = $('#aesKey').val();
+        var macKey = $('#macKey').val();
+        var pDataMethod = $('#processDataMethod').val();
+
+        // Flush old messages.
+        display_message("");
+        set_request("");
+
+        var logger = function(msg) {
+            append_message(msg);
+        };
+
+        var endpointConfig = getSettings();
+        var userConfig = {
+            aesKey: aesKey,
+            macKey: macKey,
+            callRequestType: pDataMethod
+        };
+
+        var request = new eb.comm.hotp.newHotpUserRequest(undefined, userId);
+        request.configure(userConfig);
+        request.configure(endpointConfig);
+
+        // Logging settings.
+        request.logger = logger;
+
+        // Callbacks settings.
+        request.done(function(response, requestObj, data) {
+            console.log("DONE! " + JSON.stringify(response));
+
+        }).fail(function(failType, data){
+            console.log("fail! type=" + failType);
+
+        }).always(function(request, data){
+            console.log("it is over...");
+        });
+
+        // Build the request so we can display request in the form.
+        request.build();
+        set_request(sprintf("%s<br/>\n%s<br/>\n%s<br/>\n",
+                request.getApiUrl(),
+                JSON.stringify(request.getApiRequestData()),
+                JSON.stringify(request.getSocketRequest())));
+
+        // Do the call.
+        request.doRequest();
+    }
+
+    $(function(){
+        // Start random number collectors.
+        sjcl.random.startCollectors();
+
+        // Button click handling.
+        $('#btnRegister').click(function(){
+            requestSimple($('#data').val());
+        });
+    });
+
+</script>
+
+</body>
+</html>
