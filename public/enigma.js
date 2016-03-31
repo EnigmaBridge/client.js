@@ -314,7 +314,7 @@ eb.misc = {
             return sjcl.codec.hex.toBits(sprintf("%02x", x));
 
         } else if (typeof(x) === 'string') {
-            x = x.trim();
+            x = x.trim().replace(/^0x/, '');
             if (!(x.match(/^[0-9A-Fa-f]+$/))){
                 throw eb.exception.invalid("Invalid hex coded number");
             }
@@ -340,7 +340,7 @@ eb.misc = {
             return sprintf("%x", x);
 
         } else if (typeof(x) === 'string') {
-            x = x.trim();
+            x = x.trim().replace(/^0x/, '');
             if (!(x.match(/^[0-9A-Fa-f]+$/))){
                 throw eb.exception.invalid("Invalid hex coded number");
             }
