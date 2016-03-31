@@ -218,8 +218,8 @@
         var hotpSecret = $('#hotpSecret').val();
         var hotpSecretBits = sjcl.codec.hex.toBits(hotpSecret);
         var hotpCtr = parseInt($('#hotpCtr').val());
-        var hotpCode = eb.comm.hotp.hotpCompute(hotpSecretBits, hotpCtr, 6);
-        var hotpCodeStr = sprintf("%06d", hotpCode);
+        var hotpCode = eb.comm.hotp.hotpCompute(hotpSecretBits, hotpCtr, 8);
+        var hotpCodeStr = sprintf("%08d", hotpCode);
 
         $('#hotpCtr').val(hotpCtr+1);
         $('#hotpCodeDiv').html(hotpCodeStr);
@@ -273,6 +273,7 @@
         }).fail(function(failType, data){
             log("fail! type=" + failType);
             if (failType == 0x2){
+                log("Fail msg: " + data.response.toString());
                 finished(data.response);
             }
 
