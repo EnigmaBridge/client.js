@@ -931,6 +931,7 @@ eb.comm = {
         SW_AUTH_TOO_MANY_FAILED_TRIES:  0x2000 | 0x0b1,
         SW_AUTHMETHOD_UNKNOWN:          0x2000 | 0x0ba,
         SW_HOTP_COUNTER_OVERFLOW:       0x2000 | 0x0b3,
+        SW_HOTP_WRONG_CODE:             0x2000 | 0x0b0,
 
         ERROR_CLASS_WRONGDATA:          0x8000,
         SW_INVALID_TLV_FORMAT:          0x8000 | 0x04c,
@@ -2783,7 +2784,7 @@ eb.comm.hotp = {
      * @param method auth operation to perform, default=TLV_TYPE_HOTPCODE
      */
     getUserAuthRequest: function(userId, authCode, userCtx, method){
-        var builder = new eb.comm.hotp.hotpUserAuthRequestBuilder(usr);
+        var builder = new eb.comm.hotp.hotpUserAuthRequestBuilder(userId);
         return builder.build({
             userId: userId,
             authCode: authCode,
@@ -2927,7 +2928,7 @@ eb.comm.hotp.hotpResponse.inheritsFrom(eb.comm.processDataResponse, {
     hotpShouldUpdateCtx: false,
 
     toString: function(){
-        return sprintf("HOTPResponse{hotpStatus=0x%4X, userId: %s, hotpKeyLen: %s, UserCtx: %s, parsingOk: %s, sub:{%s}}",
+        return sprintf("HOTPResponse{hotpStatus=0x%04X, userId: %s, hotpKeyLen: %s, UserCtx: %s, parsingOk: %s, sub:{%s}}",
             this.hotpStatus,
             this.hotpUserId !== undefined ? sjcl.codec.hex.fromBits(eb.comm.hotp.userIdToBits(this.hotpUserId)) : 'undefined',
             this.hotpKey !== undefined ? sjcl.bitArray.bitLength(this.hotpKey) : 'undefined',
@@ -3035,10 +3036,11 @@ eb.comm.hotp.hotpUserAuthRequestBuilder.inheritsFrom(eb.comm.base, {
 
         var verificationCode = eb.comm.hotp.userIdToHex(userId) + authCode;
         var verificationCodeBits = hex.toBits(verificationCode);
+        var userCtxBits = eb.misc.inputToBits(userCtx);
 
         var request = hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT));
-        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(userCtx)/8)));
-        request = ba.concat(request, userCtx);
+        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(userCtxBits)/8)));
+        request = ba.concat(request, userCtxBits);
 
         request = ba.concat(request, hex.toBits(sprintf("%02x", tlvOp)));
         request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(verificationCodeBits)/8)));
@@ -3385,7 +3387,7 @@ eb.comm.hotp.newHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
 eb.comm.hotp.authHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
     userCtx: undefined,
     hotpCode: undefined,
-    hotpLength: undefined,
+    hotpLength: 6,
 
     /**
      * Process HOTP configuration.
@@ -3405,7 +3407,7 @@ eb.comm.hotp.authHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
     /**
      * Initializes state and builds request
      */
-    build: function(hotpData){
+    build: function(configObject){
         this._log("Building request body");
         if (configObject && 'hotp' in configObject){
             this.configureHotp(configObject.hotp);
@@ -3446,6 +3448,7 @@ eb.comm.hotp.authHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
         }
 
         if (this.failCallbackOrig){
+            data.response = this.response;
             this.failCallbackOrig(eb.comm.status.PDATA_FAIL_RESPONSE_FAILED, data);
         }
     }
