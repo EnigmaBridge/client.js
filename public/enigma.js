@@ -2679,13 +2679,14 @@ eb.comm.hotp = {
      * @param ctr
      * @returns {*}
      */
-    hotpGetQrLink: function(secret, label, web, ctr){
+    hotpGetQrLink: function(secret, label, web, issuer, ctr){
         var secretBits = eb.misc.inputToBits(secret);
         var secret32 = sjcl.codec.base32.fromBits(secretBits);
-        return sprintf("otpauth://hotp/%s:%s?secret=%s&issuer=EB&counter=%d",
+        return sprintf("otpauth://hotp/%s:%s?secret=%s&issuer=%s&counter=%d",
             label,
             web,
             secret32,
+            issuer,
             ctr);
     },
 
