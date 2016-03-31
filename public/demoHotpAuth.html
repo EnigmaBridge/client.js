@@ -127,6 +127,12 @@
                 <span>Hexcoded hmac API key
                 </span>
             </label>
+
+            <label>HOTP digits
+                <input type="text" name="hotpDigits" id="hotpDigits" value="8"/>
+                <span>Number of digits in HOTP code
+                </span>
+            </label>
         </div>
 
         <div class="section"><span>2</span>Response</div>
@@ -215,11 +221,12 @@
     }
 
     function generate(){
+        var digits = $('#hotpDigits').val();
         var hotpSecret = $('#hotpSecret').val();
         var hotpSecretBits = sjcl.codec.hex.toBits(hotpSecret);
         var hotpCtr = parseInt($('#hotpCtr').val());
-        var hotpCode = eb.comm.hotp.hotpCompute(hotpSecretBits, hotpCtr, 8);
-        var hotpCodeStr = sprintf("%08d", hotpCode);
+        var hotpCode = eb.comm.hotp.hotpCompute(hotpSecretBits, hotpCtr, digits);
+        var hotpCodeStr = sprintf("%06d", hotpCode);
 
         $('#hotpCtr').val(hotpCtr+1);
         $('#hotpCodeDiv').html(hotpCodeStr);
@@ -300,6 +307,7 @@
         var hotpKey = getURLParameter('key');
         var userId = getURLParameter('userId');
         var userCtx = getURLParameter('userCtx');
+        var hotpDigits = getURLParameter('digits');
         if (hotpKey !== undefined){
             $('#hotpSecret').val(hotpKey);
         }
@@ -308,6 +316,9 @@
         }
         if (userCtx !== undefined){
             $('#userCtx').val(userCtx);
+        }
+        if (hotpDigits !== undefined){
+            $('#hotpDigits').val(hotpDigits);
         }
 
         // Button click handling.

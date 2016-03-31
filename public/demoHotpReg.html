@@ -94,6 +94,12 @@
                 <span>Hexcoded hmac API key
                 </span>
             </label>
+
+            <label>HOTP digits
+                <input type="text" name="hotpDigits" id="hotpDigits" value="8"/>
+                <span>Number of digits in HOTP code
+                </span>
+            </label>
         </div>
 
         <div class="section"><span>2</span>Response</div>
@@ -205,6 +211,7 @@
     }
 
     function finished(response){
+        var digits = $('#hotpDigits').val();
         $('#hotpStatus').val(sprintf("%04X", response.hotpStatus));
 
         if (response.hotpUserId){
@@ -217,7 +224,7 @@
             // HOTP codes.
             var i, codes=[];
             for(i=0; i<5; i++){
-                codes.push(""+eb.comm.hotp.hotpCompute(response.hotpKey, i, 6));
+                codes.push(""+eb.comm.hotp.hotpCompute(response.hotpKey, i, digits));
             }
 
             $('#htops').val(codes.join(" "));
@@ -227,6 +234,7 @@
                         label: sjcl.codec.hex.fromBits(response.hotpUserId),
                         web: "demo.enigmabridge.com",
                         issuer: "EnigmaBridge",
+                        digits: digits,
                         ctr:0
             });
             $('#qrLink').val(qrLink);
@@ -241,6 +249,7 @@
                 web: "demo.enigmabridge.com",
                 issuer: "EnigmaBridge",
                 ctr:0,
+                digits: digits,
                 stripPadding: true
             });
             log("QR link2: " + qrLink2);
@@ -250,10 +259,11 @@
 
             // Auth link.
             $('#redirBlock').show();
-            $('#redirHref').attr("href", sprintf("demoHotpAuth.html?key=%s&userId=%s&userCtx=%s",
+            $('#redirHref').attr("href", sprintf("demoHotpAuth.html?key=%s&userId=%s&userCtx=%s&digits=%d",
                     sjcl.codec.hex.fromBits(response.hotpKey),
                     sjcl.codec.hex.fromBits(response.hotpUserId),
-                    sjcl.codec.hex.fromBits(response.hotpUserCtx)
+                    sjcl.codec.hex.fromBits(response.hotpUserCtx),
+                    digits
             ));
         }
 
