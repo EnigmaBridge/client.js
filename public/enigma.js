@@ -2724,7 +2724,7 @@ eb.comm.hotp.hotpUserAuthCtxInfo.inheritsFrom(eb.comm.base, {
      * User ID to authenticate / create new HOTPCTX for.
      * Server parameter.
      */
-    userID: undefined,
+    userId: undefined,
 
     /**
      * HOTP key - after new HOTPCTX(), server provides symmetric key for generating HOTP codes.
