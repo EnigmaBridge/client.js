@@ -2830,8 +2830,9 @@ eb.comm.hotp.newHotpUserRequestBuilder.inheritsFrom(eb.comm.base, {
         options = $.extend(defaults, options || {});
         var userId = options && options.userId;
         this.userId = userId || this.userId;
-        if (!this.userId){
-            throw new eb.exception.invalid("User ID is undefined");
+        if (!this.userId || this.userId.length == 0){
+            // User ID is not important for now. EB generates a new one at random.
+            this.userId = "01";
         }
 
         var ba = sjcl.bitArray;
