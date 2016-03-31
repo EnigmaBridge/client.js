@@ -3113,7 +3113,7 @@ eb.comm.hotp.hotpUserAuthResponseParser.inheritsFrom(eb.comm.hotp.generalHotpPar
 /**
  * HOTP request, base class.
  */
-eb.comm.hotp.hotpRequest.inheritsFrom(eb.comm.apiRequest, {
+eb.comm.hotp.hotpRequest.inheritsFrom(eb.comm.processData, {
     /**
      * UserObject to use for the call.
      */
