@@ -3221,6 +3221,7 @@ eb.comm.hotp.newHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
 
         // Build the new HOTPCTX() request.
         var upperRequest = eb.comm.hotp.getNewUserRequest(this.userId);
+        this._log("New HOTPCTX request: " + sjcl.codec.hex.fromBits(upperRequest));
 
         // Request data to lower process data builder.
         eb.comm.hotp.newHotpUserRequest.superclass.build.call(this, [], upperRequest);
@@ -3290,6 +3291,8 @@ eb.comm.hotp.authHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
             eb.comm.hotp.hotpCodeToHexCoded(this.hotpCode, this.hotpLength),
             this.userCtx,
             eb.comm.hotp.TLV_TYPE_HOTPCODE);
+
+        this._log("HOTP Auth request: " + sjcl.codec.hex.fromBits(upperRequest));
 
         // Request data to lower process data builder.
         eb.comm.hotp.authHotpUserRequest.superclass.build.call(this, [], upperRequest);
