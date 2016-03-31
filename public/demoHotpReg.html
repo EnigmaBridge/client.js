@@ -54,13 +54,12 @@
 
             <label>User object ID
                 <input type="text" name="userObjectID" id="userObjectID" value="8855"/>
-                <span></span>
+                <span>User object used for HOTP context generation</span>
             </label>
 
             <label>ProcessData method
                 <input type="text" name="processDataMethod" id="processDataMethod" value="AUTH_NEWUSERCTX"/>
-                <span>
-                </span>
+                <span></span>
             </label>
 
             <label>Endpoint
@@ -251,7 +250,7 @@
 
             // Auth link.
             $('#redirBlock').show();
-            $('#redirHref').attr("href", sprintf("demoHotpAuth.html?key=%s&userId=%suserCtx=%s",
+            $('#redirHref').attr("href", sprintf("demoHotpAuth.html?key=%s&userId=%s&userCtx=%s",
                     sjcl.codec.hex.fromBits(response.hotpKey),
                     sjcl.codec.hex.fromBits(response.hotpUserId),
                     sjcl.codec.hex.fromBits(response.hotpUserCtx)
