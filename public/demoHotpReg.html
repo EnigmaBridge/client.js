@@ -8,6 +8,14 @@
         h1 {font-size: 14pt; }
         h2 {font-size: 12pt; }
         #footer {font-size: 8pt; text-align: center; padding: 0 10px 10px 10px}
+        .qr {
+            float: left;
+            padding: 10px;
+            overflow:hidden;
+        }
+        .qrWrap {
+            overflow: auto;
+        }
         .logbox {
             background-color: #2A88AD;
             padding: 10px 10px 10px 10px;
@@ -121,7 +129,10 @@
                 <span>QR code content used to initialize authenticator</span>
             </label>
 
-            <div id="qrcode"></div>
+            <div class="qrWrap">
+                <div id="qrcode" class="qr"></div>
+                <div id="qrcode2" class="qr"></div>
+            </div>
         </div>
         <div class="button-section">
             <input type="button" id="btnRegister" value="Register"/>
@@ -220,6 +231,19 @@
             // QR code...
             $('#qrcode').html("");
             $('#qrcode').qrcode(qrLink);
+
+            // QR code for picky iPhones.
+            var qrLink2 = eb.comm.hotp.hotpGetQrLink(response.hotpKey, {
+                label: sjcl.codec.hex.fromBits(response.hotpUserId),
+                web: "demo.enigmabridge.com",
+                issuer: "EnigmaBridge",
+                ctr:0,
+                stripPadding: true
+            });
+            log("QR link2: " + qrLink2);
+
+            $('#qrcode2').html("");
+            $('#qrcode2').qrcode(qrLink2);
         }
 
         if (response.hotpUserCtx){
