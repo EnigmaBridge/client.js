@@ -2434,6 +2434,9 @@ eb.comm.hotp = {
         var aesMac = new sjcl.cipher.aes(randomMacKey);
         var hmac = new sjcl.misc.hmac_cbc(aesMac, 16, eb.padding.empty);
 
+        // Padding of the TPL.
+        tpl = eb.padding.pkcs7.pad(tpl);
+
         // IV is null, nonce in the first block is kind of IV.
         var IV = sjcl.codec.hex.toBits('00'.repeat(16));
         var encryptedData = sjcl.mode.cbc.encrypt(aes, tpl, IV, [], true);
