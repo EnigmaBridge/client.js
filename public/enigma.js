@@ -2736,6 +2736,14 @@ eb.comm.hotp.hotpResponse.inheritsFrom(eb.comm.processDataResponse, {
      */
     hotpParsingSuccessful: false,
 
+    /**
+     * If true, server should update its user ctx for given user.
+     * Flag added by the response parser.
+     * If request fails from some reason, server still may need to update context - e.g., to
+     * store fail counter.
+     */
+    hotpShouldUpdateCtx: false,
+
     toString: function(){
         return sprintf("HOTPResponse{hotpStatus=0x%4X, userId: %s, hotpKeyLen: %s, UserCtx: %s, parsingOk: %s, sub:{%s}}",
             this.hotpStatus,
@@ -2890,6 +2898,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         this.response = response;
         response.hotpStatus = 0x0;
         response.hotpParsingSuccessful = false;
+        response.hotpShouldUpdateCtx = false;
 
         // Check plaintext lenght, should be zero.
         var plainLen = ba.extract(data, offset, 16);
@@ -3001,6 +3010,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         response.hotpStatus = ba.extract(data, offset, 16);
         offset += 16;
 
+        response.hotpShouldUpdateCtx = true;
         response.hotpParsingSuccessful = true;
         return response;
     }
