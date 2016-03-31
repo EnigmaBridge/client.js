@@ -2580,6 +2580,7 @@ eb.comm.hotp = {
 
     /**
      * User context holder constructor.
+     * Can be used by a client to hold all important data about user for HOTP.
      */
     hotpUserAuthCtxInfo: function(){
 
@@ -2656,6 +2657,10 @@ eb.comm.hotp = {
     }
 
 };
+
+/**
+ * HOTP user context holder.
+ */
 eb.comm.hotp.hotpUserAuthCtxInfo.inheritsFrom(eb.comm.base, {
     /**
      * User Auth context blob.
@@ -2706,6 +2711,10 @@ eb.comm.hotp.hotpUserAuthCtxInfo.inheritsFrom(eb.comm.base, {
      */
     userPasswdHash: undefined,
 });
+
+/**
+ * HOTP EB response.
+ */
 eb.comm.hotp.hotpResponse.inheritsFrom(eb.comm.processDataResponse, {
     /**
      * bitArray with HOTP user context blob.
@@ -2755,6 +2764,10 @@ eb.comm.hotp.hotpResponse.inheritsFrom(eb.comm.processDataResponse, {
         );
     }
 });
+
+/**
+ * new HOTP user request builder.
+ */
 eb.comm.hotp.newHotpUserRequestBuilder.inheritsFrom(eb.comm.base, {
     userId: undefined,
 
@@ -2800,6 +2813,10 @@ eb.comm.hotp.newHotpUserRequestBuilder.inheritsFrom(eb.comm.base, {
         return request;
     }
 });
+
+/**
+ * HOTP user auth request builder.
+ */
 eb.comm.hotp.hotpUserAuthRequestBuilder.inheritsFrom(eb.comm.base, {
     /**
      * Auth request builder.
@@ -2856,6 +2873,10 @@ eb.comm.hotp.hotpUserAuthRequestBuilder.inheritsFrom(eb.comm.base, {
         return request;
     }
 });
+
+/**
+ * General HOTP response parser, base class.
+ */
 eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
     response: undefined,
 
@@ -3015,6 +3036,10 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         return response;
     }
 });
+
+/**
+ * new HOTP user response parser.
+ */
 eb.comm.hotp.newHotpUserResponseParser.inheritsFrom(eb.comm.hotp.generalHotpParser, {
     parse: function(data, resp, options){
         options = options || {};
@@ -3026,6 +3051,10 @@ eb.comm.hotp.newHotpUserResponseParser.inheritsFrom(eb.comm.hotp.generalHotpPars
         return eb.comm.hotp.newHotpUserResponseParser.superclass.parse.call(this, data, resp, options);
     }
 });
+
+/**
+ * HOTP user auth response parser.
+ */
 eb.comm.hotp.hotpUserAuthResponseParser.inheritsFrom(eb.comm.hotp.generalHotpParser, {
     parse: function(data, resp, options){
         options = options || {};
