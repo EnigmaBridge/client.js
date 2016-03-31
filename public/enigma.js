@@ -3148,7 +3148,7 @@ eb.comm.hotp.hotpRequest.inheritsFrom(eb.comm.apiRequest, {
         }
 
         // Configure with parent.
-        eb.comm.hotpRequest.superclass.configure.call(this, configObject);
+        eb.comm.hotp.hotpRequest.superclass.configure.call(this, configObject);
 
         // Configure this.
         if ('hotp' in configObject){
@@ -3263,7 +3263,7 @@ eb.comm.hotp.authHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
      */
     configureHotp: function(hotpObject){
         // Configure with parent.
-        eb.comm.authHotpUserRequest.superclass.configureHotp.call(this, hotpObject);
+        eb.comm.hotp.authHotpUserRequest.superclass.configureHotp.call(this, hotpObject);
 
         // Configure this.
         var ak = eb.misc.absorbKey;
