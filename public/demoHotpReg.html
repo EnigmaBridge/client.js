@@ -129,6 +129,10 @@
                 <span>QR code content used to initialize authenticator</span>
             </label>
 
+            <div id="redirBlock">
+                <a href="#" id="redirHref" target="_blank">Authenticate page</a>
+            </div>
+
             <div class="qrWrap">
                 <div id="qrcode" class="qr"></div>
                 <div id="qrcode2" class="qr"></div>
@@ -244,6 +248,14 @@
 
             $('#qrcode2').html("");
             $('#qrcode2').qrcode(qrLink2);
+
+            // Auth link.
+            $('#redirBlock').show();
+            $('#redirHref').attr("href", sprintf("demoHotpAuth.html?key=%s&userId=%suserCtx=%s",
+                    sjcl.codec.hex.fromBits(response.hotpKey),
+                    sjcl.codec.hex.fromBits(response.hotpUserId),
+                    sjcl.codec.hex.fromBits(response.hotpUserCtx)
+            ));
         }
 
         if (response.hotpUserCtx){
@@ -285,7 +297,7 @@
             finished(response);
 
         }).fail(function(failType, data){
-            log("fail! type=" + failType);
+            log("fail! type=" + failType + ", data=" + JSON.stringify(data));
 
         }).always(function(request, data){
             log("it is over...");
@@ -305,6 +317,7 @@
     $(function(){
         // Start random number collectors.
         sjcl.random.startCollectors();
+        $('#redirBlock').hide();
 
         // Button click handling.
         $('#btnRegister').click(function(){
