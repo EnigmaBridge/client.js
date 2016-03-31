@@ -2552,7 +2552,7 @@ eb.comm.hotp = {
             idx = codeLength-(i+1)*2;
             cur = inputCode.substring(idx, idx + 2);
             curNum = parseInt(cur, 10);
-            result = sprintf("%02X", curNum) + result;
+            result = sprintf("%04X", curNum) + result;
         }
         return result;
     },
