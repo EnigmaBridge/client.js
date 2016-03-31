@@ -209,12 +209,12 @@
             $('#htops').val(codes.join(" "));
 
             // QR link code.
-            var qrLink = eb.comm.hotp.hotpGetQrLink(
-                    response.hotpKey,
-                    sjcl.codec.hex.fromBits(response.hotpUserId),
-                    "demo.enigmabridge.com",
-                    "EnigmaBridge",
-                    0);
+            var qrLink = eb.comm.hotp.hotpGetQrLink(response.hotpKey, {
+                        label: sjcl.codec.hex.fromBits(response.hotpUserId),
+                        web: "demo.enigmabridge.com",
+                        issuer: "EnigmaBridge",
+                        ctr:0
+            });
             $('#qrLink').val(qrLink);
 
             // QR code...

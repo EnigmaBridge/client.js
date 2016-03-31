@@ -2674,20 +2674,44 @@ eb.comm.hotp = {
     /**
      * Generates QR code link.
      * @param secret
-     * @param label
-     * @param web
-     * @param ctr
+     * @param options - additional options affecting QR code link generation.
+     *      label: user name for HOTP auth,
+     *      web: HOTP login gateway identification,
+     *      issuer: HOTP account identification (e.g., enigmabridge, facebook, gmail, ....),
+     *      ctr: HOTP counter,
+     *      stripPadding: removes '=' from secret in the link, fixing problem with some HOTP authenticators.
+     *
      * @returns {*}
      */
-    hotpGetQrLink: function(secret, label, web, issuer, ctr){
+    hotpGetQrLink: function(secret, options){
+        var defaults = {
+            label: "EB",
+            web: "enigmabridge.com",
+            issuer: undefined,
+            ctr: 0,
+            stripPadding: false
+        };
+
+        options = $.extend(defaults, options || {});
+        var label = options && options.label;
+        var web = options && options.web;
+        var issuer = options && options.issuer;
+        var ctr = options && options.ctr;
+        var stripPadding = options && options.stripPadding;
+
+        // Construct the secret.
         var secretBits = eb.misc.inputToBits(secret);
         var secret32 = sjcl.codec.base32.fromBits(secretBits);
-        return sprintf("otpauth://hotp/%s:%s?secret=%s&issuer=%s&counter=%d",
+        if (stripPadding){
+            secret32 = secret32.replace(/=/g,'');
+        }
+
+        return sprintf("otpauth://hotp/%s:%s?secret=%s%s%s",
             label,
             web,
             secret32,
-            issuer,
-            ctr);
+            issuer ? "&issuer="+issuer : "",
+            ctr ? "&counter="+ctr : "");
     },
 
     /**
