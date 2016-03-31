@@ -2800,9 +2800,9 @@ eb.comm.hotp.hotpResponse.inheritsFrom(eb.comm.processDataResponse, {
     toString: function(){
         return sprintf("HOTPResponse{hotpStatus=0x%4X, userId: %s, hotpKeyLen: %s, UserCtx: %s, parsingOk: %s, sub:{%s}}",
             this.hotpStatus,
-            sjcl.codec.hex.fromBits(eb.comm.hotp.userIdToBits(this.userId)),
-            sjcl.bitArray.bitLength(this.hotpKey),
-            sjcl.codec.hex.fromBits(this.hotpUserCtx),
+            this.userId ? sjcl.codec.hex.fromBits(eb.comm.hotp.userIdToBits(this.userId)) : 'undefined',
+            this.hotpKey ? sjcl.bitArray.bitLength(this.hotpKey) : 'undefined',
+            this.hotpUserCtx ? sjcl.codec.hex.fromBits(this.hotpUserCtx) : 'undefined',
             this.hotpParsingSuccessful,
             eb.comm.hotp.hotpResponse.superclass.toString.call(this)
         );
