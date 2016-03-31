@@ -86,8 +86,10 @@
             </label>
 
             <label>Endpoint
-                <input type="text" name="endpoint" id="endpoint" value="dragonfly.smarthsm.net"/>
-                <span>Hostname of the EB API</span>
+                <input type="text" name="endpoint" id="endpoint" value="site1.enigmabridge.com"/>
+                <span>Hostname of the EB API
+                    <a onclick="$('#endpoint').val('site1.enigmabridge.com');">site1</a>,
+                    <a onclick="$('#endpoint').val('site2.enigmabridge.com');">site2</a></span>
             </label>
 
             <label>Method
