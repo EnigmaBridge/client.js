@@ -1342,9 +1342,10 @@ eb.comm.responseParser.prototype = {
      *
      * @param data - json response
      * @param resp - response object to put data to.
+     * @param options
      * @returns request unwrapped response.
      */
-    parse: function(data, resp){
+    parse: function(data, resp, options){
         resp = resp || this.response;
         resp = resp || new eb.comm.response();
         this.response = resp;
@@ -1416,9 +1417,10 @@ eb.comm.processDataResponseParser.inheritsFrom(eb.comm.responseParser, {
      *
      * @param data - json response
      * @param resp - response object to put data to.
+     * @param options
      * @returns request unwrapped response.
      */
-    parse: function(data, resp){
+    parse: function(data, resp, options){
         resp = resp || this.response;
         resp = resp || new eb.comm.processDataResponse();
         this.response = resp;
