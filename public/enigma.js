@@ -2855,6 +2855,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
      * General parsing routine for HOTP responses.
      *
      * @param data
+     * @param resp response to fill in with parsed data, takes preference to options.response
      * @param options
      *      tlvOp: HOTP operation to expect
      *      methods: auth methods to parse from the response (default=0)
@@ -2864,7 +2865,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
      *
      * @returns {*|eb.comm.response|null|request|number|Object}
      */
-    parse: function(data, options){
+    parse: function(data, resp, options){
         // ref: processUserAuthResponse
         var ba = sjcl.bitArray;
         var offset = 0;
@@ -2883,10 +2884,9 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         var methods = options && options.methods;
         var bIsLocalCtxUpdate = options && options.bIsLocalCtxUpdate;
         var givenUserId = options && options.userId;
-        var response = options && options.response;
-        if (!response){
-            response = new eb.comm.hotp.hotpResponse();
-        }
+        var response = resp || (options && options.response);
+        response = response || new eb.comm.hotp.hotpResponse();
+
         this.response = response;
         response.hotpStatus = 0x0;
         response.hotpParsingSuccessful = false;
@@ -3006,23 +3006,23 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
     }
 });
 eb.comm.hotp.newHotpUserResponseParser.inheritsFrom(eb.comm.hotp.generalHotpParser, {
-    parse: function(data, options){
+    parse: function(data, resp, options){
         options = options || {};
         options.tlvOp = eb.comm.hotp.TLV_TYPE_NEWAUTHCONTEXT;
         options.methods = eb.comm.hotp.USERAUTH_FLAG_HOTP;
         options.bIsLocalCtxUpdate = true;
         options.userId = undefined;
 
-        return eb.comm.hotp.newHotpUserResponseParser.superclass.parse.call(this, data, options);
+        return eb.comm.hotp.newHotpUserResponseParser.superclass.parse.call(this, data, resp, options);
     }
 });
 eb.comm.hotp.hotpUserAuthResponseParser.inheritsFrom(eb.comm.hotp.generalHotpParser, {
-    parse: function(data, options){
+    parse: function(data, resp, options){
         options = options || {};
         options.tlvOp = eb.comm.hotp.TLV_TYPE_HOTPCODE;
         options.methods = eb.comm.hotp.USERAUTH_FLAG_HOTP;
         options.bIsLocalCtxUpdate = false;
 
-        return eb.comm.hotp.hotpUserAuthResponseParser.superclass.parse.call(this, data, options);
+        return eb.comm.hotp.hotpUserAuthResponseParser.superclass.parse.call(this, data, resp, options);
     }
 });
