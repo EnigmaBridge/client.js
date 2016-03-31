@@ -311,7 +311,7 @@ eb.misc = {
     inputToBits: function(x){
         var ln;
         if (typeof(x) === 'number'){
-            return sjcl.codec.hex.toBits(sprintf("%x", x));
+            return sjcl.codec.hex.toBits(sprintf("%02x", x));
 
         } else if (typeof(x) === 'string') {
             x = x.trim();
