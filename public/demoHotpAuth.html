@@ -49,13 +49,14 @@
             </label>
 
             <label>Counter
-                <input type="text" name="hotpCtr" id="hotpCtr" value="0"/>
+                <input type="text" name="hotpCtr" id="hotpCtr" value="0000000000000001"/>
                 <span>Counter for HOTP derivation</span>
             </label>
 
             <div id="hotpCodeDiv" class="hotpCode"></div>
             <div class="button-section">
                 <input type="button" id="btnGenerate" value="Generate"/>
+                <input type="button" id="btnGenerateBug" value="Generate - with ctr bug"/>
             </div>
         </div>
 
@@ -151,6 +152,7 @@
         </div>
         <div class="button-section">
             <input type="button" id="btnAuthenticate" value="Authenticate"/>
+            <input type="button" id="btnAuthenticateUpdate" value="Authenticate &amp; Update"/>
         </div>
     </form>
 </div>
@@ -164,6 +166,8 @@
 
 <script>
     "use strict";
+    var updateCtxFlag=false;
+
     function set_request(msg){
         $("#reqRest")[0].innerHTML = msg;
     }
@@ -217,19 +221,65 @@
     }
 
     function updateCtx(){
-        $('#userCtx').val($('#newUserCtx').val());
+        var newCtx = $('#newUserCtx').val();
+        if (!newCtx || newCtx.length==0){
+            console.log("Empty CTX");
+            return;
+        }
+
+        $('#userCtx').val(newCtx);
     }
 
-    function generate(){
+    function pad8b(x){
+        return (x.length<16) ? (('0'.repeat(16-x.length))+x) : x
+    }
+
+    function revHex(x){
+        if ((x.length & 1) == 1){
+            x = '0'+x;
+        }
+
+        var ln = x.length;
+        var z = "";
+        var i;
+        for(i=0; i<ln; i+=2){
+            z += x.substring(ln-i-2, ln-i);
+        }
+
+        return z;
+    }
+
+    function generate(bugCtr){
+        bugCtr = bugCtr || false;
+
         var digits = $('#hotpDigits').val();
         var hotpSecret = $('#hotpSecret').val();
         var hotpSecretBits = sjcl.codec.hex.toBits(hotpSecret);
-        var hotpCtr = $('#hotpCtr').val();
+        var hotpCtr = pad8b($('#hotpCtr').val());
+        var bn = new sjcl.bn(hotpCtr);
+
+        // Initial conversion.
+        if (bugCtr && !bn.greaterEquals(new sjcl.bn('100000000000000'))){
+            hotpCtr = revHex(pad8b(hotpCtr));
+            console.log("Initial conversion to: " + hotpCtr);
+        }
+
+        // Compute HOTP code.
         var hotpCode = eb.comm.hotp.hotpCompute(hotpSecretBits, hotpCtr, digits);
         var hotpCodeStr = sprintf("%0"+digits+"d", hotpCode);
 
-        var bn = new sjcl.bn(hotpCtr);
-        $('#hotpCtr').val(bn.addM(1).toString().replace(/^0x/, ''));
+        // Incrementation.
+        if (bugCtr){
+            bn = new sjcl.bn(revHex(hotpCtr));
+            hotpCtr = revHex(pad8b(bn.addM(1).toString().replace(/^0x/, '')));
+
+        } else {
+            bn = new sjcl.bn(hotpCtr);
+            hotpCtr = pad8b(bn.addM(1).toString().replace(/^0x/, ''));
+
+        }
+
+        $('#hotpCtr').val(hotpCtr);
         $('#hotpCodeDiv').html(hotpCodeStr);
         $('#hotpCode').val(hotpCodeStr);
     }
@@ -239,6 +289,16 @@
 
         if (response.hotpUserCtx){
             $('#newUserCtx').val(sjcl.codec.hex.fromBits(response.hotpUserCtx));
+        }
+
+        if (updateCtxFlag){
+            updateCtx();
+        }
+
+        if (response.hotpStatus == eb.comm.status.SW_STAT_OK){
+            $('#hotpStatus').css({ 'background': '#ddffdd' });
+        } else {
+            $('#hotpStatus').css({ 'background': '#ffdddd' });
         }
     }
 
@@ -324,11 +384,22 @@
 
         // Button click handling.
         $('#btnAuthenticate').click(function(){
+            updateCtxFlag=false;
+            requestSimple();
+        });
+
+        // Button click handling.
+        $('#btnAuthenticateUpdate').click(function(){
+            updateCtxFlag=true;
             requestSimple();
         });
 
         $('#btnGenerate').click(function(){
             generate();
+        });
+
+        $('#btnGenerateBug').click(function(){
+            generate(true);
         });
     });
 
