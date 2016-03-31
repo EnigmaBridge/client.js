@@ -2654,6 +2654,43 @@ eb.comm.hotp = {
             userCtx: userCtx,
             authOperation: method || eb.comm.hotp.TLV_TYPE_HOTPCODE
         });
+    },
+
+    /**
+     * General HOTP process data request constructor.
+     * @param uo    UserObject to use for the call.
+     * @abstract
+     * @private
+     */
+    hotpRequest: function(uo){
+        var av = eb.misc.absorbValue;
+        av(this, uo, 'uo');
+    },
+
+    /**
+     * Request for new HOTP CTX constructor.
+     * @param uo    UserObject to use for the call.
+     * @param userId user ID to create context for.
+     */
+    newHotpUserRequest: function(uo, userId){
+        var av = eb.misc.absorbValue;
+        av(this, uo, 'uo');
+        av(this, userId, 'userId');
+    },
+
+    /**
+     * Request to authenticate HOTP user constructor.
+     * @param uo UserObject to use for the call.
+     * @param userId
+     * @param userCtx
+     * @param hotpCode
+     */
+    authHotpUserRequest: function(uo, userId, userCtx, hotpCode){
+        var av = eb.misc.absorbValue;
+        av(this, uo, 'uo');
+        av(this, userId, 'userId');
+        av(this, userCtx, 'userCtx');
+        av(this, hotpCode, 'hotpCode');
     }
 
 };
@@ -3065,3 +3102,216 @@ eb.comm.hotp.hotpUserAuthResponseParser.inheritsFrom(eb.comm.hotp.generalHotpPar
         return eb.comm.hotp.hotpUserAuthResponseParser.superclass.parse.call(this, data, resp, options);
     }
 });
+
+/**
+ * HOTP request, base class.
+ */
+eb.comm.hotp.hotpRequest.inheritsFrom(eb.comm.apiRequest, {
+    /**
+     * UserObject to use for the call.
+     */
+    uo: undefined,
+
+    /**
+     * User ID to use.
+     */
+    userId: undefined,
+
+    // Done & fail callback hooking.
+    doneCallbackOrig: function(response, requestObj, data){},
+    failCallbackOrig: function(failType, data){},
+
+    done: function(x){
+        this.doneCallbackOrig = x;
+        eb.comm.hotp.hotpRequest.superclass.done.call(this, this.subDone);
+        return this;
+    },
+
+    fail: function(x){
+        this.failCallbackOrig = x;
+        eb.comm.hotp.hotpRequest.superclass.fail.call(this, this.subFail);
+        return this;
+    },
+
+    /**
+     * Process configuration from the config object.
+     * @param configObject object with the configuration.
+     */
+    configure: function(configObject){
+        if (!configObject){
+            this._log("Invalid config object");
+            return;
+        }
+
+        // Configure with parent.
+        eb.comm.hotpRequest.superclass.configure.call(this, configObject);
+
+        // Configure this.
+        if ('hotp' in configObject){
+            this.configureHotp(configObject.hotp);
+        }
+    },
+
+    /**
+     * Configuration helper for HOTP data.
+     * Called from configure() and build().
+     * @param hotpData
+     */
+    configureHotp: function(hotpData){
+        var ak = eb.misc.absorbKey;
+        ak(this, hotpData, "uo");
+        ak(this, hotpData, "userId");
+    },
+
+    /**
+     * Response object is HOTP response.
+     * After data unwrap, it will be processed further.
+     *
+     * @returns {eb.comm.hotp.hotpResponse}
+     */
+    getResponseObject: function(){
+        return new eb.comm.hotp.hotpResponse();
+    },
+
+    /**
+     * Called when underlying parser finished processing. Post processing here.
+     *
+     * @param response
+     * @param requestObj
+     * @param data
+     * @private
+     */
+    subDone: function(response, requestObj, data){
+        if (this.doneCallbackOrig){
+            this.doneCallbackOrig(response, requestObj, data);
+        }
+    },
+
+    /**
+     * Called when underlying api request failed. Post processing here.
+     * @param failType
+     * @param data
+     */
+    subFail: function(failType, data){
+        if (this.failCallbackOrig){
+            this.failCallbackOrig(failType, data);
+        }
+    }
+});
+
+/**
+ * New HOTP user request.
+ */
+eb.comm.hotp.newHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
+    /**
+     * Initializes state and builds request
+     */
+    build: function(configObject){
+        this._log("Building request body");
+        if ('hotp' in configObject){
+            this.configureHotp(configObject.hotp);
+        }
+
+        // Build the new HOTPCTX() request.
+        var upperRequest = eb.comm.hotp.getNewUserRequest(this.userId);
+
+        // Request data to lower process data builder.
+        eb.comm.hotp.newHotpUserRequest.superclass.build.call(this, [], upperRequest);
+    },
+
+    /**
+     * Process result, unwrapped by the underlying response parser.
+     * @param response
+     * @param requestObj
+     * @param data
+     */
+    subDone: function(response, requestObj, data){
+        var parser = new eb.comm.hotp.newHotpUserResponseParser();
+        try {
+            this.response = response = parser.parse(response.protectedData, response);
+            if (response.hotpStatus == eb.comm.status.SW_STAT_OK) {
+                if (this.doneCallbackOrig) {
+                    this.doneCallbackOrig(response, requestObj, data);
+                }
+                return;
+            }
+        } catch(e){
+            data.hotpException = e;
+        }
+
+        if (this.failCallbackOrig){
+            this.failCallbackOrig(eb.comm.status.PDATA_FAIL_RESPONSE_FAILED, data);
+        }
+    }
+});
+
+/**
+ * HOTP user auth request.
+ */
+eb.comm.hotp.authHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
+    userCtx: undefined,
+    hotpCode: undefined,
+    hotpLength: undefined,
+
+    /**
+     * Process HOTP configuration.
+     * @param hotpObject hotp object
+     */
+    configureHotp: function(hotpObject){
+        // Configure with parent.
+        eb.comm.authHotpUserRequest.superclass.configureHotp.call(this, hotpObject);
+
+        // Configure this.
+        var ak = eb.misc.absorbKey;
+        ak(this, hotpObject, "userCtx");
+        ak(this, hotpObject, "hotpCode");
+        ak(this, hotpObject, "hotpLength");
+    },
+
+    /**
+     * Initializes state and builds request
+     */
+    build: function(hotpData){
+        this._log("Building request body");
+        if ('hotp' in configObject){
+            this.configureHotp(configObject.hotp);
+        }
+
+        // Build the auth request.
+        var upperRequest = eb.comm.hotp.getUserAuthRequest(
+            this.userId,
+            eb.comm.hotp.hotpCodeToHexCoded(this.hotpCode, this.hotpLength),
+            this.userCtx,
+            eb.comm.hotp.TLV_TYPE_HOTPCODE);
+
+        // Request data to lower process data builder.
+        eb.comm.hotp.authHotpUserRequest.superclass.build.call(this, [], upperRequest);
+    },
+
+    /**
+     * Process result, unwrapped by the underlying response parser.
+     * @param response
+     * @param requestObj
+     * @param data
+     */
+    subDone: function(response, requestObj, data){
+        var parser = new eb.comm.hotp.hotpUserAuthResponseParser();
+        try {
+            this.response = response = parser.parse(response.protectedData, response, {'userId' : this.userId});
+            if (response.hotpStatus == eb.comm.status.SW_STAT_OK) {
+                if (this.doneCallbackOrig) {
+                    this.doneCallbackOrig(response, requestObj, data);
+                }
+                return;
+            }
+
+        } catch(e){
+            data.hotpException = e;
+        }
+
+        if (this.failCallbackOrig){
+            this.failCallbackOrig(eb.comm.status.PDATA_FAIL_RESPONSE_FAILED, data);
+        }
+    }
+});
+
