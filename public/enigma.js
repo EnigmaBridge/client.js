@@ -2690,6 +2690,7 @@ eb.comm.hotp = {
             web: "enigmabridge.com",
             issuer: undefined,
             ctr: 0,
+            digits: undefined,
             stripPadding: false
         };
 
@@ -2699,6 +2700,7 @@ eb.comm.hotp = {
         var issuer = options && options.issuer;
         var ctr = options && options.ctr;
         var stripPadding = options && options.stripPadding;
+        var digits = options && options.digits;
 
         // Construct the secret.
         var secretBits = eb.misc.inputToBits(secret);
@@ -2707,12 +2709,14 @@ eb.comm.hotp = {
             secret32 = secret32.replace(/=/g,'');
         }
 
-        return sprintf("otpauth://hotp/%s:%s?secret=%s%s%s",
-            label,
-            web,
+        return sprintf("otpauth://hotp/%s:%s?secret=%s%s%s%s",
+            encodeURIComponent(label),
+            encodeURIComponent(web),
             secret32,
-            issuer !== undefined ? "&issuer="+issuer : "",
-            ctr !== undefined ? "&counter="+ctr : "");
+            issuer !== undefined ? "&issuer="+encodeURIComponent(issuer) : "",
+            ctr !== undefined ? "&counter="+ctr : "",
+            digits !== undefined ? "&digits="+digits : ""
+        );
     },
 
     /**
