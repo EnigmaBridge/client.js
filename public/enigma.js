@@ -2481,7 +2481,7 @@ eb.comm.hotp = {
     // Template for generation of new user context.
     // USER_AUTH_CTX structure: version 1B | user_id 8B | flags 4B | #total_failed_tries 1B | #max_total_failed_tries 1B | TLV_auth_method1 | ... | TLV_auth_method_n |
     //               VR    USER-ID-8B     flags   #e #m tt len  |TLV method - HOTP
-    ctxTemplateUsr: '01         %s       00000000 00 04 3f 001d 00 03 1234567812345678 02 08 10 11223344556677881122334455667788',
+    ctxTemplateUsr: '01         %s       00000000 00 04 3f 001d 00 03 0000000000000000 02 08 10 11223344556677881122334455667788',
 
     // Constants
     TLV_TYPE_USERAUTHCONTEXT: 0xa3,
@@ -2645,7 +2645,7 @@ eb.comm.hotp = {
     hotpCompute: function(key, ctr, length){
         var hmac = new sjcl.misc.hmac(eb.misc.inputToBits(key), sjcl.hash.sha1);
 
-        // Ctr is 8 byte coutner, big endian coded. Make sure it has correct length.
+        // Ctr is 8 byte counter, big endian coded. Make sure it has correct length.
         var ctrBits = eb.misc.inputToBits(ctr);
         var ctrHex = eb.misc.inputToHex(ctr).trim();
         var ctrHexLn = ctrHex.length;
