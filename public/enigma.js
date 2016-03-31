@@ -2980,13 +2980,13 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         // Extract user context.
         var userCtxLen = ba.extract(data, offset, 16);
         offset += 16;
-        response.hotpUserCtx = ba.bitSlice(dat, offset, offset+userCtxLen*8);
+        response.hotpUserCtx = ba.bitSlice(data, offset, offset+userCtxLen*8);
         offset += userCtxLen*8;
 
         // Main TLV op type
         var msgTlv = ba.extract(data, offset, 8);
         offset += 8;
-        if (tag != tlvOp){
+        if (msgTlv != tlvOp){
             response.hotpStatus = eb.comm.status.SW_INVALID_TLV_FORMAT;
             throw new eb.exception.corrupt("Main TLV tag does not match");
         }
@@ -2996,7 +2996,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         offset += 16;
 
         // User ID
-        var requestUserId = ba.bitSlice(dat, offset, offset+eb.comm.hotp.USERAUTHCTX_MAIN_USERID_LENGTH*8);
+        var requestUserId = ba.bitSlice(data, offset, offset+eb.comm.hotp.USERAUTHCTX_MAIN_USERID_LENGTH*8);
         offset += eb.comm.hotp.USERAUTHCTX_MAIN_USERID_LENGTH*8;
 
         // Compare set user id.
