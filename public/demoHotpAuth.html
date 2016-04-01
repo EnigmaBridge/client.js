@@ -326,7 +326,7 @@
         var userId = $('#userId').val();
         var userCtx = $('#userCtx').val();
         var hotpCode = $('#hotpCode').val();
-        var request = new eb.comm.hotp.authHotpUserRequest(undefined, userId, userCtx, hotpCode);
+        var request = new eb.comm.hotp.authHotpUserRequest({'userId': userId, 'userCtx': userCtx, 'hotpCode': hotpCode});
         request.configure(userConfig);
         request.configure(endpointConfig);
 

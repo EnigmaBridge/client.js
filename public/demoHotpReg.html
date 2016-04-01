@@ -96,7 +96,7 @@
             </label>
 
             <label>HOTP digits
-                <input type="text" name="hotpDigits" id="hotpDigits" value="8"/>
+                <input type="text" name="hotpDigits" id="hotpDigits" value="6"/>
                 <span>Number of digits in HOTP code
                 </span>
             </label>
@@ -282,6 +282,7 @@
         var aesKey = $('#aesKey').val();
         var macKey = $('#macKey').val();
         var pDataMethod = $('#processDataMethod').val();
+        var digits = $('#hotpDigits').val();
 
         // Flush old messages.
         display_message("");
@@ -298,7 +299,7 @@
             callRequestType: pDataMethod
         };
 
-        var request = new eb.comm.hotp.newHotpUserRequest();
+        var request = new eb.comm.hotp.newHotpUserRequest({'hotpLength': digits});
         request.configure(userConfig);
         request.configure(endpointConfig);
 
