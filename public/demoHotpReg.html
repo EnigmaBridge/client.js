@@ -213,6 +213,11 @@
     function finished(response){
         var digits = $('#hotpDigits').val();
         $('#hotpStatus').val(sprintf("%04X", response.hotpStatus));
+        if (response.hotpStatus == eb.comm.status.SW_STAT_OK){
+            $('#hotpStatus').css({ 'background': '#ddffdd' });
+        } else {
+            $('#hotpStatus').css({ 'background': '#ffdddd' });
+        }
 
         if (response.hotpUserId){
             $('#userId').val(sjcl.codec.hex.fromBits(eb.comm.hotp.userIdToBits(response.hotpUserId)));
