@@ -287,7 +287,26 @@
     }
 
     function finished(response){
-        $('#hotpStatus').val(sprintf("%04X", response.hotpStatus));
+        var statusElem = $('#hotpStatus');
+        var status = sprintf("%04X", response.hotpStatus);
+        if (response.hotpStatus == eb.comm.status.SW_STAT_OK){
+            status += ' - Authenticated successfully';
+        } else if (response.hotpStatus == eb.comm.status.SW_AUTH_TOO_MANY_FAILED_TRIES){
+            status += ' - Failed, too many attempts';
+        } else if (response.hotpStatus == eb.comm.status.SW_HOTP_TOO_MANY_FAILED_TRIES){
+            status += ' - Failed, too many HOTP attempts';
+        } else if (response.hotpStatus == eb.comm.status.SW_HOTP_WRONG_CODE){
+            status += ' - Failed, invalid HOTP code';
+        } else {
+            status += ' - Failed, unknown error';
+        }
+
+        statusElem.val(status);
+        if (response.hotpStatus == eb.comm.status.SW_STAT_OK){
+            statusElem.css({ 'background': '#ddffdd' });
+        } else {
+            statusElem.css({ 'background': '#ffdddd' });
+        }
 
         if (response.hotpUserCtx){
             $('#newUserCtx').val(sjcl.codec.hex.fromBits(response.hotpUserCtx));
@@ -295,12 +314,6 @@
 
         if (updateCtxFlag){
             updateCtx();
-        }
-
-        if (response.hotpStatus == eb.comm.status.SW_STAT_OK){
-            $('#hotpStatus').css({ 'background': '#ddffdd' });
-        } else {
-            $('#hotpStatus').css({ 'background': '#ffdddd' });
         }
     }
 
