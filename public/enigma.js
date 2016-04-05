@@ -2516,12 +2516,13 @@ eb.comm.hotp = {
     ctxTemplateHotp:    '3f 001d 00 03 0000000000000000 02 %02x 10 11223344556677881122334455667788',
 
     // Passwd method:    tt len  cf mf hl   password hash
-    ctxTemplatePasswd:  '40 0013 00 03 %02x %s',
+    ctxTemplatePasswd:  '40 %04x 00 03 %02x %s',
 
     // VR - version
     // #e - total failed entries
     // #m - max total failed entries
     // tt - auth method type. 0x3f = HOTP, 0x40 = password auth.
+    // len - overall auth record length
     // Dg - digits
     // Ln - secret length
     // cf - current fails
@@ -2589,8 +2590,9 @@ eb.comm.hotp = {
 
             hash = eb.misc.padHexToEven(eb.misc.inputToHex(hash));
             var hashLen = hash.length / 2;
+            var totalLen = 3 + hashLen;
 
-            ctx += sprintf(this.ctxTemplatePasswd, hashLen, hash);
+            ctx += sprintf(this.ctxTemplatePasswd, totalLen, hashLen, hash);
         }
 
         return sjcl.codec.hex.toBits(ctx.replace(/ /g,''));
