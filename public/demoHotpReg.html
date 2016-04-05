@@ -45,7 +45,16 @@
 <div class="form-style-10">
     <h1>EnigmaBridge HOTP API test<span>new HOTPCTX() demo</span></h1>
     <form>
-        <div class="section"><span>1</span>Configuration</div>
+        <div class="section"><span>1</span>Input</div>
+        <div class="inner-wrap">
+            <label>Password
+                <input type="text" name="password" id="password" value="" placeholder="Password [optional]"/>
+                <span>Optional password for password authentication. If filled in, password authentication will be another
+                authentication method, alongside HOTP. If left empty, the only auth method is HOTP.</span>
+            </label>
+        </div>
+
+        <div class="section"><span>2</span>Configuration</div>
         <div class="inner-wrap">
             <label>API Key
                 <input type="text" name="apiKey" id="apiKey" value="TEST_API"/>
@@ -63,7 +72,7 @@
             </label>
 
             <label>Endpoint
-                <input type="text" name="endpoint" id="endpoint" value="site1.enigmabridge.com"/>
+                <input type="text" name="endpoint" id="endpoint" value="site2.enigmabridge.com"/>
                 <span>Hostname of the EB API
                     <a onclick="$('#endpoint').val('site1.enigmabridge.com');">site1</a>,
                     <a onclick="$('#endpoint').val('site2.enigmabridge.com');">site2</a></span>
@@ -102,7 +111,7 @@
             </label>
         </div>
 
-        <div class="section"><span>2</span>Response</div>
+        <div class="section"><span>3</span>Response</div>
         <div class="inner-wrap">
             <label>Status code
                 <input type="text" name="hotpStatus" id="hotpStatus" placeholder="HOTP status code"/>
@@ -125,7 +134,7 @@
             </label>
 
             <label>First 5 codes
-                <input type="text" name="htops" id="htops" placeholder="1 2 3 4 5"/>
+                <input type="text" name="htops" id="htops" placeholder="000000 111111 222222 333333 444444"/>
                 <span>First HOTP codes generated, should match HOTP authenticator output.</span>
             </label>
 
@@ -278,11 +287,12 @@
     }
 
     function requestSimple(){
-        var h = sjcl.codec.hex;
         var aesKey = $('#aesKey').val();
         var macKey = $('#macKey').val();
         var pDataMethod = $('#processDataMethod').val();
         var digits = $('#hotpDigits').val();
+        var password = $('#password').val();
+        password = password ? password.trim() : '';
 
         // Flush old messages.
         display_message("");
@@ -299,7 +309,28 @@
             callRequestType: pDataMethod
         };
 
-        var request = new eb.comm.hotp.newHotpUserRequest({'hotpLength': digits});
+        // Configuration for creating a new auth context.
+        // Nested is necessary as we can configure the whole stack with this configuration,
+        // including endpoints, ports, protocols, schemes and so on.
+        var reqConfig = {
+            hotp:{
+                methods: eb.comm.hotp.USERAUTH_FLAG_HOTP,
+                hotp:{
+                    digits: digits
+                }
+            }
+        };
+
+        // If password is configured, add it as an auth method.
+        if (password && password.length > 0){
+            reqConfig.hotp.methods |= eb.comm.hotp.USERAUTH_FLAG_PASSWD;
+            reqConfig.hotp.passwd = reqConfig.hotp.passwd || {};
+            reqConfig.hotp.passwd.hash = sjcl.hash.sha256.hash(password);
+            log("Password configured. Hash=" + eb.misc.inputToHex(reqConfig.hotp.passwd.hash));
+        }
+
+        log("Create Auth context configuration: " + JSON.stringify(reqConfig));
+        var request = new eb.comm.hotp.newHotpUserRequest(reqConfig);
         request.configure(userConfig);
         request.configure(endpointConfig);
 
@@ -312,7 +343,7 @@
             finished(response);
 
         }).fail(function(failType, data){
-            log("fail! type=" + failType + ", data=" + JSON.stringify(data));
+            log("fail! type=" + failType + ", response="+(data && data.response ? data.response.toString() : 'undefined')+"\n data=" + JSON.stringify(data));
 
         }).always(function(request, data){
             log("it is over...");

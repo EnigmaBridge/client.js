@@ -2509,15 +2509,24 @@ eb.comm.getPubKey.inheritsFrom(eb.comm.apiRequest, {
 eb.comm.hotp = {
     // Template for generation of new user context.
     // USER_AUTH_CTX structure: version 1B | user_id 8B | flags 4B | #total_failed_tries 1B | #max_total_failed_tries 1B | TLV_auth_method1 | ... | TLV_auth_method_n |
-    //               VR    USER-ID-8B     flags   #e #m tt len  |TLV method - HOTP
-    //                |          |          |     |  |  |  |    |     HOTP 8B counter     Dg   Ln Secret - template
-    ctxTemplateUsr: '01         %s       00000000 00 04 3f 001d 00 03 0000000000000000 02 %02x 10 11223344556677881122334455667788',
+    //                   VR    USER-ID-8B     flags   #e #m
+    ctxTemplateUsr:     '01         %s       00000000 00 04',
+
+    // HOTP method:      tt  len cf mf HOTP 8B counter  ct  Dg  Ln Secret - template
+    ctxTemplateHotp:    '3f 001d 00 03 0000000000000000 02 %02x 10 11223344556677881122334455667788',
+
+    // Passwd method:    tt len  cf mf hl   password hash
+    ctxTemplatePasswd:  '40 0013 00 03 %02x %s',
+
     // VR - version
     // #e - total failed entries
     // #m - max total failed entries
-    // tt
+    // tt - auth method type. 0x3f = HOTP, 0x40 = password auth.
     // Dg - digits
     // Ln - secret length
+    // cf - current fails
+    // mf - maximum number of fails
+    // hl - hash length
 
     // Constants
     TLV_TYPE_USERAUTHCONTEXT: 0xa3,
@@ -2536,22 +2545,55 @@ eb.comm.hotp = {
     HOTP_DIGITS_DEFAULT: 6,
 
     /**
-     * Returns HOTPCTX template with prefilled user id.
+     * Builds generalized context template from the options.
+     * May contain two authentization methods at the moment, HOTP, Password.
      * @param options
-     *          userId (default conts)
-     *          digits (default 6)
-     * @returns {*}
+     *      userId:  user ID aditional entropy. By default 0000000000000001
+     *      methods: flags for methods to include in context. USERAUTH_FLAG_HOTP, USERAUTH_FLAG_PASSWD.
+     *      hotp: {digits}: hotp digits in the template. HOTP code length.
+     *      passwd: {hash}: password hash used for authentication.
      */
-    getCtxTemplateUsr: function(options){
+    getCtxTemplate: function(options){
         var defaults = {
             userId: eb.comm.hotp.userIdToHex("01"),
-            digits: eb.comm.hotp.HOTP_DIGITS_DEFAULT
+            methods: eb.comm.hotp.USERAUTH_FLAG_HOTP,
+            hotp:{
+                digits: eb.comm.hotp.HOTP_DIGITS_DEFAULT
+            },
+            passwd:{
+                hash: undefined
+            }
         };
-        options = $.extend(defaults, options || {});
-        var userId = options && options.userId;
-        var digits = options && options.digits;
 
-        return sjcl.codec.hex.toBits(sprintf(this.ctxTemplateUsr, userId, digits).replace(/ /g,''));
+        options = $.extend(true, defaults, options || {});
+        var useHotp = options && ((options.methods & eb.comm.hotp.USERAUTH_FLAG_HOTP) > 0);
+        var usePass = options && ((options.methods & eb.comm.hotp.USERAUTH_FLAG_PASSWD) > 0);
+
+        var userId = eb.comm.hotp.userIdToHex(options && options.userId);
+
+        // Build base context.
+        var ctx = sprintf(this.ctxTemplateUsr, userId);
+
+        // Add HOTP method, if desired.
+        if (useHotp){
+            var digits = options && options.hotp && options.hotp.digits;
+            ctx += sprintf(this.ctxTemplateHotp, digits);
+        }
+
+        // Add Password method, if desired.
+        if (usePass){
+            var hash = options && options.passwd && options.passwd.hash;
+            if (hash === undefined || hash.length == 0) {
+                throw new eb.exception.invalid("Password auth method specified, empty hash");
+            }
+
+            hash = eb.misc.padHexToEven(eb.misc.inputToHex(hash));
+            var hashLen = hash.length / 2;
+
+            ctx += sprintf(this.ctxTemplatePasswd, hashLen, hash);
+        }
+
+        return sjcl.codec.hex.toBits(ctx.replace(/ /g,''));
     },
 
     /**
@@ -2792,12 +2834,14 @@ eb.comm.hotp = {
 
     /**
      * New HOTPCTX request builder constructor.
-     * @param userId - hex coded user ID, 8bytes.
-     * @param digits - number of digits in hotp code
+     * @param options.
+     *      userId:  user ID aditional entropy. By default 0000000000000001
+     *      methods: flags for methods to include in context. USERAUTH_FLAG_HOTP, USERAUTH_FLAG_PASSWD.
+     *      hotp: {digits}: hotp digits in the template. HOTP code length.
+     *      passwd: {hash}: password hash used for authentication.
      */
-    newHotpUserRequestBuilder: function(userId, digits){
-        this.userId = userId || undefined;
-        this.hotpLength = digits || eb.comm.hotp.HOTP_DIGITS_DEFAULT;
+    newHotpUserRequestBuilder: function(options){
+        this.configure(options);
     },
 
     /**
@@ -2819,16 +2863,6 @@ eb.comm.hotp = {
      */
     hotpUserAuthResponseParser: function(){
 
-    },
-
-    /**
-     * Convenience function for building new hotp context request.
-     * @param userId
-     * @param digits
-     */
-    getNewUserRequest: function(userId, digits){
-        var builder = new eb.comm.hotp.newHotpUserRequestBuilder(userId, digits);
-        return builder.build();
     },
 
     /**
@@ -2867,10 +2901,12 @@ eb.comm.hotp = {
      *          hotpLength number of digits
      */
     newHotpUserRequest: function(options){
+        options = options || {};
+        this.configure(options);
         var ak = eb.misc.absorbKey;
         ak(this, options, 'uo');
         ak(this, options, 'userId');
-        ak(this, options, 'hotpLength');
+        ak(this, options.hotp, 'userId');
     },
 
     /**
@@ -2882,6 +2918,7 @@ eb.comm.hotp = {
      *          hotpCode
      */
     authHotpUserRequest: function(options){
+        options = options || {};
         var ak = eb.misc.absorbKey;
         ak(this, options, 'uo');
         ak(this, options, 'userId');
@@ -3002,41 +3039,46 @@ eb.comm.hotp.hotpResponse.inheritsFrom(eb.comm.processDataResponse, {
  * new HOTP user request builder.
  */
 eb.comm.hotp.newHotpUserRequestBuilder.inheritsFrom(eb.comm.base, {
-    userId: undefined,
-    hotpLength: eb.comm.hotp.HOTP_DIGITS_DEFAULT,
+    defaults: {
+        userId: undefined,
+        methods: eb.comm.hotp.USERAUTH_FLAG_HOTP,
+        hotp:{
+            digits: eb.comm.hotp.HOTP_DIGITS_DEFAULT
+        },
+        passwd:{
+            hash: undefined
+        }
+    },
+
+    /**
+     * Configures local object with the preferences.
+     * @param options
+     *      userId:  user ID aditional entropy. By default 0000000000000001
+     *      methods: flags for methods to include in context. USERAUTH_FLAG_HOTP, USERAUTH_FLAG_PASSWD.
+     *      hotp: {digits}: hotp digits in the template. HOTP code length.
+     *      passwd: {hash}: password hash used for authentication.
+     */
+    configure: function(options){
+        if (options) {
+            this.defaults = $.extend(true, this.defaults, options || {});
+        }
+    },
 
     /**
      * New HOTCTX request builder.
      * @param options
+     * TODO: options
      *      userId - hex coded user ID, 8B. If undefined, this.userId is used.
      * @returns {*}
      */
     build: function(options){
-        // ref: performCreateNewAuthCtx
-        // Options.
-        var defaults = {
-            userId: undefined,
-            digits: undefined,
-        };
-        options = $.extend(defaults, options || {});
-        var userId = options && options.userId;
-        var digits = options && options.digits;
-        this.userId = userId || this.userId;
-        this.hotpLength = digits || this.hotpLength;
-        if (!this.userId || this.userId.length == 0){
-            // User ID is not important for now. EB generates a new one at random.
-            this.userId = "01";
-        }
+        this.configure(options);
 
         var ba = sjcl.bitArray;
         var hex = sjcl.codec.hex;
 
         // Part 1 - auth context, encrypt with random password, template.
-        var tpl = eb.comm.hotp.getCtxTemplateUsr({
-                userId: eb.comm.hotp.userIdToHex(this.userId),
-                digits:this.hotpLength
-        });
-
+        var tpl = eb.comm.hotp.getCtxTemplate(this.defaults);
         var userAuthCtxPrepared = eb.comm.hotp.prepareUserContext(tpl);
 
         // Part 2 - auth context, unprotected
@@ -3283,9 +3325,11 @@ eb.comm.hotp.newHotpUserResponseParser.inheritsFrom(eb.comm.hotp.generalHotpPars
     parse: function(data, resp, options){
         options = options || {};
         options.tlvOp = eb.comm.hotp.TLV_TYPE_NEWAUTHCONTEXT;
-        options.methods = eb.comm.hotp.USERAUTH_FLAG_HOTP;
         options.bIsLocalCtxUpdate = true;
         options.userId = undefined;
+        if (options.methods === undefined){
+            options.methods = eb.comm.hotp.USERAUTH_FLAG_HOTP;
+        }
 
         return eb.comm.hotp.newHotpUserResponseParser.superclass.parse.call(this, data, resp, options);
     }
@@ -3311,6 +3355,7 @@ eb.comm.hotp.hotpUserAuthResponseParser.inheritsFrom(eb.comm.hotp.generalHotpPar
 eb.comm.hotp.hotpRequest.inheritsFrom(eb.comm.processData, {
     /**
      * UserObject to use for the call.
+     * TODO: once ready, move to processData request as comm keys will be stored there.
      */
     uo: undefined,
 
@@ -3403,9 +3448,13 @@ eb.comm.hotp.hotpRequest.inheritsFrom(eb.comm.processData, {
 
 /**
  * New HOTP user request.
+ * TODO: For configuration, new configuration builder can be implemented.
  */
 eb.comm.hotp.newHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
-    hotpLength: eb.comm.hotp.HOTP_DIGITS_DEFAULT,
+    /**
+     * Configuration object given in construction / configure / build phases
+     */
+    authConfig: $.extend(true, {}, eb.comm.hotp.newHotpUserRequestBuilder.defaults),
 
     /**
      * Process HOTP configuration.
@@ -3415,9 +3464,8 @@ eb.comm.hotp.newHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
         // Configure with parent.
         eb.comm.hotp.newHotpUserRequest.superclass.configureHotp.call(this, hotpObject);
 
-        // Configure this.
-        var ak = eb.misc.absorbKey;
-        ak(this, hotpObject, "hotpLength");
+        // authConfig
+        this.authConfig = $.extend(true, this.authConfig, hotpObject || {});
     },
 
     /**
@@ -3430,7 +3478,10 @@ eb.comm.hotp.newHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
         }
 
         // Build the new HOTPCTX() request.
-        var upperRequest = eb.comm.hotp.getNewUserRequest(this.userId, this.hotpLength);
+        var builder = new eb.comm.hotp.newHotpUserRequestBuilder(this.authConfig);
+        var upperRequest = builder.build();
+
+        //var upperRequest = eb.comm.hotp.getNewUserRequest(this.userId, this.hotpLength);
         this._log("New HOTPCTX request: " + sjcl.codec.hex.fromBits(upperRequest));
 
         // Request data to lower process data builder.
@@ -3444,9 +3495,14 @@ eb.comm.hotp.newHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
      * @param data
      */
     subDone: function(response, requestObj, data){
-        var parser = new eb.comm.hotp.newHotpUserResponseParser();
+        var parser = new eb.comm.hotp.newHotpUserResponseParser(this.authConfig);
+        var options = {};
+        if (this.authConfig && this.authConfig.methods){
+            options.methods = this.authConfig.methods;
+        }
+
         try {
-            this.response = response = parser.parse(response.protectedData, response);
+            this.response = response = parser.parse(response.protectedData, response, options);
             if (response.hotpStatus == eb.comm.status.SW_STAT_OK) {
                 if (this.doneCallbackOrig) {
                     this.doneCallbackOrig(response, requestObj, data);
