@@ -358,6 +358,27 @@ eb.misc = {
 
         }
     },
+
+    /**
+     * Left zero padding to the even number of hexcoded digits.
+     * @param x
+     * @returns {*}
+     */
+    padHexToEven: function(x){
+        x = x.trim().replace(/[\s]+/g, '').replace(/^0x/, '');
+        return ((x.length & 1) == 1) ? ('0'+x) : x;
+    },
+
+    /**
+     * Left zero padding for hex string to the given size.
+     * @param x
+     * @param size
+     * @returns {*}
+     */
+    padHexToSize: function(x, size){
+        x = x.trim().replace(/[\s]+/g, '').replace(/^0x/, '');
+        return (x.length<size) ? (('0'.repeat(size-x.length))+x) : x
+    }
 };
 
 eb.codec = {};
