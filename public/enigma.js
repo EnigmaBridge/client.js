@@ -322,7 +322,7 @@ eb.misc = {
         } else if (typeof(x) === 'string') {
             x = x.trim().replace(/^0x/, '');
             if (!(x.match(/^[0-9A-Fa-f]+$/))){
-                throw eb.exception.invalid("Invalid hex coded number");
+                throw new eb.exception.invalid("Invalid hex coded number");
             }
 
             return sjcl.codec.hex.toBits(x);
@@ -348,7 +348,7 @@ eb.misc = {
         } else if (typeof(x) === 'string') {
             x = x.trim().replace(/^0x/, '');
             if (!(x.match(/^[0-9A-Fa-f]+$/))){
-                throw eb.exception.invalid("Invalid hex coded number");
+                throw new eb.exception.invalid("Invalid hex coded number");
             }
 
             return x;
@@ -2615,7 +2615,7 @@ eb.comm.hotp = {
             x = x.trim();
             ln = x.length;
             if (ln > 16 || ln === 0 || !(x.match(/^[0-9A-Fa-f]+$/))){
-                throw eb.exception.invalid("User ID string invalid");
+                throw new eb.exception.invalid("User ID string invalid");
             }
 
             return eb.comm.hotp.userIdBitsNormalize(sjcl.codec.hex.toBits(x));
@@ -2644,7 +2644,7 @@ eb.comm.hotp = {
             x = x.trim();
             ln = x.length;
             if (ln > 16 || ln === 0 || !(x.match(/^[0-9A-Fa-f]+$/))){
-                throw eb.exception.invalid("User ID string invalid");
+                throw new eb.exception.invalid("User ID string invalid");
             }
 
             return ln < 16 ? ('0'.repeat(16-ln)) + x : x;
@@ -2654,7 +2654,7 @@ eb.comm.hotp = {
             tmp = sjcl.codec.hex.fromBits(x);
             ln = tmp.length;
             if (ln > 16){
-                throw eb.exception.invalid("User ID string invalid");
+                throw new eb.exception.invalid("User ID string invalid");
             }
             return ln < 16 ? ('0'.repeat(16-ln)) + tmp : tmp;
         }
@@ -2675,7 +2675,7 @@ eb.comm.hotp = {
         var ctrHex = eb.misc.inputToHex(ctr).trim();
         var ctrHexLn = ctrHex.length;
         if (ctrHexLn > 16){
-            throw eb.exception.invalid("Counter value is too big");
+            throw new eb.exception.invalid("Counter value is too big");
 
         } else if (ctrHexLn < 16){
             ctrHex = ('0'.repeat(16-ctrHexLn)) + ctrHex;
