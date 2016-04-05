@@ -954,18 +954,20 @@ eb.comm = {
      */
     status: {
         ERROR_CLASS_SECURITY:           0x2000,
-        SW_AUTH_MISMATCH_USER_ID:       0x2000 | 0x0b6,
-        SW_AUTH_TOO_MANY_FAILED_TRIES:  0x2000 | 0x0b1,
-        SW_AUTHMETHOD_UNKNOWN:          0x2000 | 0x0ba,
-        SW_HOTP_COUNTER_OVERFLOW:       0x2000 | 0x0b3,
-        SW_HOTP_WRONG_CODE:             0x2000 | 0x0b0,
-
+        
         ERROR_CLASS_WRONGDATA:          0x8000,
         SW_INVALID_TLV_FORMAT:          0x8000 | 0x04c,
         SW_WRONG_PADDING:               0x8000 | 0x03d,
-        SW_HOTP_KEY_WRONG_LENGTH:       0x8000 | 0x056,
-        SW_HOTP_TOO_MANY_FAILED_TRIES:  0x8000 | 0x066,
         SW_STAT_INVALID_APIKEY:         0x8000 | 0x068,
+
+        ERROR_CLASS_SECURITY_USER:      0xa000,
+        SW_HOTP_KEY_WRONG_LENGTH:       0xa000 | 0x056,
+        SW_HOTP_TOO_MANY_FAILED_TRIES:  0xa000 | 0x066,
+        SW_HOTP_WRONG_CODE:             0xa000 | 0x0b0,
+        SW_HOTP_COUNTER_OVERFLOW:       0xa000 | 0x0b3,
+        SW_AUTHMETHOD_UNKNOWN:          0xa000 | 0x0ba,
+        SW_AUTH_TOO_MANY_FAILED_TRIES:  0xa000 | 0x0b1,
+        SW_AUTH_MISMATCH_USER_ID:       0xa000 | 0x0b6,
 
         SW_STAT_OK:                     0x9000,
 
