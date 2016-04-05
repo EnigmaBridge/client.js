@@ -1996,8 +1996,8 @@ eb.comm.connector.prototype = {
      */
     getSocketRequest: function(){
         this._socketRequest = {};
-        $.extend(this._socketRequest, this.reqHeader || {});
-        $.extend(this._socketRequest, this.reqBody || {});
+        $.extend(true, this._socketRequest, this.reqHeader || {});
+        $.extend(true, this._socketRequest, this.reqBody || {});
         return this._socketRequest;
     },
 
@@ -2292,7 +2292,7 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
 
         var toConfig = configObject;
         if ("userObjectId" in configObject){
-            toConfig = $.extend(toConfig, {apiKeyLow4Bytes : configObject.userObjectId});
+            toConfig = $.extend(true, toConfig, {apiKeyLow4Bytes : configObject.userObjectId});
         }
 
         // Configure with parent.
