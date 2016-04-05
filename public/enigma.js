@@ -3329,9 +3329,7 @@ eb.comm.hotp.newHotpUserResponseParser.inheritsFrom(eb.comm.hotp.generalHotpPars
         options.tlvOp = eb.comm.hotp.TLV_TYPE_NEWAUTHCONTEXT;
         options.bIsLocalCtxUpdate = true;
         options.userId = undefined;
-        if (options.methods === undefined){
-            options.methods = eb.comm.hotp.USERAUTH_FLAG_HOTP;
-        }
+        options.methods = options.methods || eb.comm.hotp.USERAUTH_FLAG_HOTP;
 
         return eb.comm.hotp.newHotpUserResponseParser.superclass.parse.call(this, data, resp, options);
     }
@@ -3343,9 +3341,9 @@ eb.comm.hotp.newHotpUserResponseParser.inheritsFrom(eb.comm.hotp.generalHotpPars
 eb.comm.hotp.hotpUserAuthResponseParser.inheritsFrom(eb.comm.hotp.generalHotpParser, {
     parse: function(data, resp, options){
         options = options || {};
-        options.tlvOp = eb.comm.hotp.TLV_TYPE_HOTPCODE;
-        options.methods = eb.comm.hotp.USERAUTH_FLAG_HOTP;
         options.bIsLocalCtxUpdate = false;
+        options.tlvOp = options.tlvOp || eb.comm.hotp.TLV_TYPE_HOTPCODE;
+        options.methods = options.methods || eb.comm.hotp.USERAUTH_FLAG_HOTP;
 
         return eb.comm.hotp.hotpUserAuthResponseParser.superclass.parse.call(this, data, resp, options);
     }
