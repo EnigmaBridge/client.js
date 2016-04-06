@@ -27,6 +27,7 @@
     <script src="jquery-1.12.1.min.js"></script>
     <script src="sprintf.js"></script>
     <script src="sjcl.js"></script>
+    <script src="he.js"></script>
     <script src="enigma.js"></script>
 </head>
 <body>
@@ -163,7 +164,7 @@
 
     function append_message(msg) {
         var status = $("#status");
-        var newMsg = formatDate(new Date()) + " - " + msg;
+        var newMsg = formatDate(new Date()) + " - " + he.encode(msg);
         status.html(status.html() + "<br/>\n" + newMsg);
     }
 
