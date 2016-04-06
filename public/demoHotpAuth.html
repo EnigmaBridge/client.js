@@ -40,6 +40,8 @@
         var defaults = {
             uoidHotp: 5588,
             uoidPasswd: 5599,
+            methodHotp:'AUTH_HOTP',
+            methodPasswd:'AUTH_PASSWD',
             site: 'site2.enigmabridge.com',
             site1: 'site1.enigmabridge.com',
             site2: 'site2.enigmabridge.com'
@@ -117,7 +119,7 @@
             </label>
 
             <label>ProcessData method
-                <input type="text" name="processDataMethod" id="processDataMethod" value="AUTH_HOTP"/>
+                <input type="text" name="processDataMethod" id="processDataMethod" value="" placeholder="ProcessData method"/>
                 <span>
                 </span>
             </label>
@@ -198,9 +200,12 @@
     var ahotp = $("#hotpCode");
     var apass = $("#password");
     var auoid = $('#userObjectID');
+    var ameth = $('#processDataMethod');
+
     ahotp.keyup(fixAuthFields);
     apass.keyup(fixAuthFields);
     auoid.val(defaults.uoidHotp);
+    ameth.val(defaults.methodHotp);
     fixAuthFields();
 
     function fixAuthFields(){
@@ -215,12 +220,14 @@
 
         } else if (passwd.length == 0){
             auoid.val(defaults.uoidHotp);
+            ameth.val(defaults.methodHotp);
             apass.val('');
             ahotp.prop('disabled', false);
             apass.prop('disabled', true);
 
         } else {
             auoid.val(defaults.uoidPasswd);
+            ameth.val(defaults.methodPasswd);
             ahotp.prop('disabled', true);
             apass.prop('disabled', false);
 
