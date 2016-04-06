@@ -2872,6 +2872,20 @@ eb.comm.hotp = {
     },
 
     /**
+     * Generator of update auth context request constructor.
+     */
+    updateAuthContextRequestBuilder: function(options){
+        this.configure(options);
+    },
+
+    /**
+     * Auth context update response parser constuctor.
+     */
+    updateAuthContextResponseParser: function(options){
+        this.configure(options);
+    },
+
+    /**
      * Convenience function for building HOTP auth request.
      * @param userId hex coded user ID, 8B.
      * @param authCode hex coded auth code.
@@ -2927,6 +2941,22 @@ eb.comm.hotp = {
      *      }
      */
     authHotpUserRequest: function(options){
+        options = options || {};
+        this.configure(options);
+    },
+
+    /**
+     * Request to update auth context constructor.
+     * @param options
+     *      hotp:
+     *      {
+     *          uo UserObject to use for the call.
+     *          userId
+     *          userCtx
+     *          TODO: complete
+     *      }
+     */
+    authContextUpdateRequest: function(options){
         options = options || {};
         this.configure(options);
     }
@@ -3167,6 +3197,86 @@ eb.comm.hotp.hotpUserAuthRequestBuilder.inheritsFrom(eb.comm.base, {
 });
 
 /**
+ * Generator of update auth context request
+ */
+eb.comm.hotp.updateAuthContextRequestBuilder.inheritsFrom(eb.comm.base, {
+    defaults: {
+        userId: undefined,
+        userCtx: undefined,
+        targetMethod: undefined,
+        passwd: undefined
+    },
+
+    /**
+     * Configures local object with the preferences.
+     * @param options
+     *      userId:  user ID aditional entropy. By default 0000000000000001
+     *      userCtx: user context to update.
+     *      targetMethod: method to update
+     *      passwd: a new password hash to set in case of targetMethod == USERAUTH_FLAG_PASSWD
+     */
+    configure: function(options){
+        if (options) {
+            this.defaults = $.extend(true, this.defaults, options || {});
+        }
+    },
+
+    build: function(options){
+        // ref: performUpdateAuthCtx
+        var ba = sjcl.bitArray;
+        var hex = sjcl.codec.hex;
+        this.configure(options);
+
+        var userId = options && options.userId;
+        var userCtx = options && options.userCtx;
+        var passwd = options && options.passwd;
+        var targetMethod = options && options.targetMethod;
+        if (!userId || !userCtx || !targetMethod){
+            throw new eb.exception.invalid("User ID / userCtx / targetMethod undefined");
+        }
+        if (targetMethod == eb.comm.hotp.USERAUTH_FLAG_PASSWD && passwd === undefined){
+            throw new eb.exception.invalid("Password update method but password hash is undefined");
+        }
+
+        // Build update context request
+        var userCtxBits = eb.misc.inputToBits(userCtx);
+        var updateCtx = [];
+
+        // User ID
+        updateCtx = ba.concat(updateCtx, eb.comm.hotp.userIdToBits(userId));
+
+        // Method #1 - HOTP
+        if (targetMethod == eb.comm.hotp.USERAUTH_FLAG_HOTP){
+            updateCtx = ba.concat(updateCtx, hex.toBits(sprintf("%02x0000", eb.comm.hotp.USER_AUTH_TYPE_HOTP)));
+        }
+
+        // Method #2 - Password
+        if (targetMethod == eb.comm.hotp.USERAUTH_FLAG_PASSWD){
+            var passwordBits = eb.comm.inputToBits(passwd);
+            updateCtx = ba.concat(updateCtx, hex.toBits(sprintf("%02x%04x", eb.comm.hotp.USER_AUTH_TYPE_PASSWD, ba.bitLength(passwordBits)/8)));
+            updateCtx = ba.concat(updateCtx, passwordBits);
+        }
+
+        // Method #3 - Global attempts
+        if (targetMethod == eb.comm.hotp.USERAUTH_FLAG_GLOBALTRIES){
+            updateCtx = ba.concat(updateCtx, hex.toBits(sprintf("%02x0000", eb.comm.hotp.USER_AUTH_TYPE_GLOBALTRIES)));
+        }
+
+        // Request itself.
+        var request = [];
+        request = ba.concat(request, hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT)));
+        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(userCtxBits)/8)));
+        request = ba.concat(request, userCtxBits);
+
+        request = ba.concat(request, hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_UPDATEAUTHCONTEXT)));
+        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(updateCtx)/8)));
+        request = ba.concat(request, updateCtx);
+
+        return request;
+    }
+});
+
+/**
  * General HOTP response parser, base class.
  */
 eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
@@ -3351,6 +3461,19 @@ eb.comm.hotp.hotpUserAuthResponseParser.inheritsFrom(eb.comm.hotp.generalHotpPar
         options.methods = options.methods || eb.comm.hotp.USERAUTH_FLAG_HOTP;
 
         return eb.comm.hotp.hotpUserAuthResponseParser.superclass.parse.call(this, data, resp, options);
+    }
+});
+
+/**
+ * HOTP user auth response parser.
+ */
+eb.comm.hotp.updateAuthContextResponseParser.inheritsFrom(eb.comm.hotp.generalHotpParser, {
+    parse: function(data, resp, options){
+        options = options || {};
+        options.bIsLocalCtxUpdate = true;
+        options.tlvOp = eb.comm.hotp.TLV_TYPE_UPDATEAUTHCONTEXT;
+
+        return eb.comm.hotp.updateAuthContextResponseParser.superclass.parse.call(this, data, resp, options);
     }
 });
 
@@ -3610,6 +3733,97 @@ eb.comm.hotp.authHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
             userId: this.userId,
             tlvOp:  this.authMethod,
             methods:this.authFlag
+        };
+
+        try {
+            this.response = response = parser.parse(response.protectedData, response, options);
+            if (response.hotpStatus == eb.comm.status.SW_STAT_OK) {
+                if (this.doneCallbackOrig) {
+                    this.doneCallbackOrig(response, requestObj, data);
+                }
+                return;
+            }
+
+        } catch(e){
+            data.hotpException = e;
+        }
+
+        if (this.failCallbackOrig){
+            data.response = this.response;
+            this.failCallbackOrig(eb.comm.status.PDATA_FAIL_RESPONSE_FAILED, data);
+        }
+    }
+});
+
+/**
+ * Request to update auth context.
+ */
+eb.comm.hotp.authContextUpdateRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
+    userCtx: undefined,
+    passwd: undefined,
+    method: undefined,
+
+    /**
+     * Process HOTP configuration.
+     * @param hotpObject hotp object
+     */
+    configureHotp: function(hotpObject){
+        // Configure with parent.
+        eb.comm.hotp.authContextUpdateRequest.superclass.configureHotp.call(this, hotpObject);
+
+        // Configure this.
+        var ak = eb.misc.absorbKey;
+        ak(this, hotpObject, "userCtx");
+        ak(this, hotpObject, "method");
+        ak(this, hotpObject, "passwd");
+    },
+
+    /**
+     * Initializes state and builds request
+     */
+    build: function(configObject){
+        this._log("Building request body");
+        if (configObject && 'hotp' in configObject){
+            this.configureHotp(configObject.hotp);
+        }
+
+        if (this.method === undefined){
+            throw new eb.exception.invalid("Update method not defined");
+        }
+        if (this.userId === undefined || this.userCtx === undefined){
+            throw new eb.exception.invalid("UserID / UserCtx not defined");
+        }
+        if (this.method === eb.comm.hotp.USERAUTH_FLAG_PASSWD && this.passwd === undefined){
+            throw new eb.exception.invalid("Update method is password but password is undefined");
+        }
+
+        // Build the auth request.
+        var reqBuilder = new eb.comm.hotp.updateAuthContextRequestBuilder({
+            userId: this.userId,
+            userCtx: this.userCtx,
+            targetMethod: this.method,
+            passwd: this.passwd
+        });
+
+        var upperRequest = reqBuilder.build();
+
+        this._log("Auth context update request: " + sjcl.codec.hex.fromBits(upperRequest));
+
+        // Request data to lower process data builder.
+        eb.comm.hotp.authContextUpdateRequest.superclass.build.call(this, [], upperRequest);
+    },
+
+    /**
+     * Process result, unwrapped by the underlying response parser.
+     * @param response
+     * @param requestObj
+     * @param data
+     */
+    subDone: function(response, requestObj, data){
+        var parser = new eb.comm.hotp.updateAuthContextResponseParser();
+        var options = {
+            userId: this.userId,
+            methods:this.method
         };
 
         try {
