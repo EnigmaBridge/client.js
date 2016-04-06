@@ -959,6 +959,7 @@ eb.comm = {
         SW_INVALID_TLV_FORMAT:          0x8000 | 0x04c,
         SW_WRONG_PADDING:               0x8000 | 0x03d,
         SW_STAT_INVALID_APIKEY:         0x8000 | 0x068,
+        SW_AUTHMETHOD_NOT_ALLOWED:      0x8000 | 0x0b9,
 
         ERROR_CLASS_SECURITY_USER:      0xa000,
         SW_HOTP_KEY_WRONG_LENGTH:       0xa000 | 0x056,
