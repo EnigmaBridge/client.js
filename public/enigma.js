@@ -968,6 +968,9 @@ eb.comm = {
         SW_AUTHMETHOD_UNKNOWN:          0xa000 | 0x0ba,
         SW_AUTH_TOO_MANY_FAILED_TRIES:  0xa000 | 0x0b1,
         SW_AUTH_MISMATCH_USER_ID:       0xa000 | 0x0b6,
+        SW_PASSWD_TOO_MANY_FAILED_TRIES:0xa000 | 0x063,
+        SW_PASSWD_INVALID_LENGTH:       0xa000 | 0x064,
+        SW_WRONG_PASSWD:                0xa000 | 0x065,
 
         SW_STAT_OK:                     0x9000,
 
