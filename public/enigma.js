@@ -2898,34 +2898,33 @@ eb.comm.hotp = {
     /**
      * Request for new HOTP CTX constructor.
      * @param options
+     *      hotp:
+     *      {
      *          uo    UserObject to use for the call.
      *          userId user ID to create context for.
      *          hotpLength number of digits
+     *      }
      */
     newHotpUserRequest: function(options){
         options = options || {};
         this.configure(options);
-        var ak = eb.misc.absorbKey;
-        ak(this, options, 'uo');
-        ak(this, options, 'userId');
-        ak(this, options.hotp, 'userId');
     },
 
     /**
      * Request to authenticate HOTP user constructor.
      * @param options
+     *      hotp:
+     *      {
      *          uo UserObject to use for the call.
      *          userId
      *          userCtx
      *          hotpCode
+     *          passwd
+     *      }
      */
     authHotpUserRequest: function(options){
         options = options || {};
-        var ak = eb.misc.absorbKey;
-        ak(this, options, 'uo');
-        ak(this, options, 'userId');
-        ak(this, options, 'userCtx');
-        ak(this, options, 'hotpCode');
+        this.configure(options);
     }
 
 };
@@ -2981,7 +2980,7 @@ eb.comm.hotp.hotpUserAuthCtxInfo.inheritsFrom(eb.comm.base, {
     /**
      * Auth password hash.
      */
-    userPasswdHash: undefined,
+    userPasswdHash: undefined
 });
 
 /**
@@ -3069,8 +3068,10 @@ eb.comm.hotp.newHotpUserRequestBuilder.inheritsFrom(eb.comm.base, {
     /**
      * New HOTCTX request builder.
      * @param options
-     * TODO: options
-     *      userId - hex coded user ID, 8B. If undefined, this.userId is used.
+     *      userId:  user ID aditional entropy. By default 0000000000000001
+     *      methods: flags for methods to include in context. USERAUTH_FLAG_HOTP, USERAUTH_FLAG_PASSWD.
+     *      hotp: {digits}: hotp digits in the template. HOTP code length.
+     *      passwd: {hash}: password hash used for authentication.
      * @returns {*}
      */
     build: function(options){
@@ -3130,8 +3131,8 @@ eb.comm.hotp.hotpUserAuthRequestBuilder.inheritsFrom(eb.comm.base, {
         var authCode = options && options.authCode;
         var userCtx = options && options.userCtx;
         var authOperation = options && options.authOperation;
-        if (!userId || !authCode || !userCtx){
-            throw new eb.exception.invalid("User ID / HOTP / userCtx code undefined");
+        if (!userId || !authCode || !userCtx || !authOperation){
+            throw new eb.exception.invalid("User ID / HOTP / userCtx / authOperation code undefined");
         }
 
         var tlvOp, methods;
@@ -3145,7 +3146,7 @@ eb.comm.hotp.hotpUserAuthRequestBuilder.inheritsFrom(eb.comm.base, {
             throw new eb.exception.invalid("Unrecognized authentication method");
         }
 
-        var verificationCode = eb.comm.hotp.userIdToHex(userId) + authCode;
+        var verificationCode = eb.comm.hotp.userIdToHex(userId) + eb.misc.inputToHex(authCode);
         var verificationCodeBits = hex.toBits(verificationCode);
         var userCtxBits = eb.misc.inputToBits(userCtx);
 
@@ -3526,6 +3527,7 @@ eb.comm.hotp.authHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
     userCtx: undefined,
     hotpCode: undefined,
     hotpLength: eb.comm.hotp.HOTP_DIGITS_DEFAULT,
+    passwd: undefined,
 
     /**
      * Process HOTP configuration.
@@ -3540,6 +3542,7 @@ eb.comm.hotp.authHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
         ak(this, hotpObject, "userCtx");
         ak(this, hotpObject, "hotpCode");
         ak(this, hotpObject, "hotpLength");
+        ak(this, hotpObject, "passwd");
     },
 
     /**
@@ -3551,12 +3554,33 @@ eb.comm.hotp.authHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
             this.configureHotp(configObject.hotp);
         }
 
+        // Current limitation - only one method at a time
+        if (this.passwd && this.passwd.length > 0 && this.hotpCode){
+            this._log("Multiple authentication methods were required.");
+            throw new eb.exception.invalid("Authentication supports only one authentication method at a time");
+        }
+
+        var authCode, authMethod;
+        if (this.passwd && this.passwd.length > 0){
+            authCode = this.passwd;
+            authMethod = eb.comm.hotp.TLV_TYPE_PASSWORDHASH;
+            this._log("Using Password authentication");
+
+        } else if (this.hotpCode) {
+            authCode = eb.comm.hotp.hotpCodeToHexCoded(this.hotpCode, this.hotpLength);
+            authMethod = eb.comm.hotp.TLV_TYPE_HOTPCODE;
+            this._log("Using HOTP authentication");
+
+        } else {
+            throw new eb.exception.invalid("No authentication data given");
+        }
+
         // Build the auth request.
         var upperRequest = eb.comm.hotp.getUserAuthRequest(
             this.userId,
-            eb.comm.hotp.hotpCodeToHexCoded(this.hotpCode, this.hotpLength),
+            authCode,
             this.userCtx,
-            eb.comm.hotp.TLV_TYPE_HOTPCODE);
+            authMethod);
 
         this._log("HOTP Auth request: " + sjcl.codec.hex.fromBits(upperRequest));
 

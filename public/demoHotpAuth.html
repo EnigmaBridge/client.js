@@ -12,6 +12,9 @@
             padding: 0px 10px 15px 10px;
             font-size: 24pt;
         }
+        input[disabled]{
+            background-color: #F8F8F8;
+        }
         .logbox {
             background-color: #2A88AD;
             padding: 10px 10px 10px 10px;
@@ -32,6 +35,19 @@
     <script src="sprintf.js"></script>
     <script src="sjcl.js"></script>
     <script src="enigma.js"></script>
+    <script>
+        "use strict";
+        var defaults = {
+            uoidHotp: 5588,
+            uoidPasswd: 5599,
+            site: 'site2.enigmabridge.com',
+            site1: 'site1.enigmabridge.com',
+            site2: 'site2.enigmabridge.com'
+        };
+
+        // Update context flag.
+        var updateCtxFlag=false;
+    </script>
 </head>
 <body>
 
@@ -76,7 +92,12 @@
 
             <label>HOTP code
                 <input type="text" name="hotpCode" id="hotpCode" placeholder="123 456"/>
-                <span>HOTP code to authenticate with</span>
+                <span>HOTP code to authenticate with. If entered, HOTP authentication method will be used.</span>
+            </label>
+
+            <label>Password
+                <input type="text" name="password" id="password" placeholder="lorem ipsum"/>
+                <span>Password authenticate with. If entered, password authentication method will be used.</span>
             </label>
         </div>
 
@@ -88,8 +109,11 @@
             </label>
 
             <label>User object ID
-                <input type="text" name="userObjectID" id="userObjectID" value="5588"/>
-                <span>User object used for HOTP verification</span>
+                <input type="text" name="userObjectID" id="userObjectID" placeholder="UserObjectID"/>
+                <span>User object used for HOTP verification.
+                    <a onclick="$('#endpoint').val(defaults.uoidHotp);">HOTP UO</a>,
+                    <a onclick="$('#endpoint').val(defaults.uoidPasswd);">Passwd UO</a>
+                    </span>
             </label>
 
             <label>ProcessData method
@@ -99,10 +123,10 @@
             </label>
 
             <label>Endpoint
-                <input type="text" name="endpoint" id="endpoint" value="site1.enigmabridge.com"/>
+                <input type="text" name="endpoint" id="endpoint" placeholder="endpoint.address.com"/>
                 <span>Hostname of the EB API
-                    <a onclick="$('#endpoint').val('site1.enigmabridge.com');">site1</a>,
-                    <a onclick="$('#endpoint').val('site2.enigmabridge.com');">site2</a></span>
+                    <a onclick="$('#endpoint').val(defaults.site1);">site1</a>,
+                    <a onclick="$('#endpoint').val(defaults.site2);">site2</a></span>
             </label>
 
             <label>Method
@@ -141,7 +165,7 @@
         <div class="section"><span>2</span>Response</div>
         <div class="inner-wrap">
             <label>Status code
-                <input type="text" name="hotpStatus" id="hotpStatus" placeholder="HOTP status code"/>
+                <input type="text" name="hotpStatus" id="hotpStatus" placeholder="Authentication status code"/>
                 <span>Authentication result, 9000 means success</span>
             </label>
 
@@ -168,7 +192,40 @@
 
 <script>
     "use strict";
-    var updateCtxFlag=false;
+    $('#endpoint').val(defaults.site);
+
+    // Shortcuts.
+    var ahotp = $("#hotpCode");
+    var apass = $("#password");
+    var auoid = $('#userObjectID');
+    ahotp.keyup(fixAuthFields);
+    apass.keyup(fixAuthFields);
+    auoid.val(defaults.uoidHotp);
+    fixAuthFields();
+
+    function fixAuthFields(){
+        var hotpCode = ahotp.val() || '';
+        var passwd = apass.val() || '';
+        hotpCode = hotpCode.trim();
+        passwd = passwd.trim();
+
+        if (passwd.length == 0 && hotpCode.length == 0){
+            ahotp.prop('disabled', false);
+            apass.prop('disabled', false);
+
+        } else if (passwd.length == 0){
+            auoid.val(defaults.uoidHotp);
+            apass.val('');
+            ahotp.prop('disabled', false);
+            apass.prop('disabled', true);
+
+        } else {
+            auoid.val(defaults.uoidPasswd);
+            ahotp.prop('disabled', true);
+            apass.prop('disabled', false);
+
+        }
+    }
 
     function set_request(msg){
         $("#reqRest")[0].innerHTML = msg;
@@ -281,9 +338,11 @@
 
         }
 
+        $("#password").val('');
         $('#hotpCtr').val(hotpCtr);
         $('#hotpCodeDiv').html(hotpCodeStr);
         $('#hotpCode').val(hotpCodeStr);
+        fixAuthFields();
     }
 
     function finished(response){
@@ -341,7 +400,19 @@
         var userId = $('#userId').val();
         var userCtx = $('#userCtx').val();
         var hotpCode = $('#hotpCode').val();
-        var request = new eb.comm.hotp.authHotpUserRequest({'userId': userId, 'userCtx': userCtx, 'hotpCode': hotpCode});
+        var password = $('#password').val();
+        var reqConfig = {hotp:{
+            'userId': userId,
+            'userCtx': userCtx
+        }};
+
+        if (hotpCode && hotpCode.length > 0){
+            reqConfig.hotp.hotpCode = hotpCode
+        } else {
+            reqConfig.hotp.passwd = sjcl.hash.sha256.hash(password);
+        }
+
+        var request = new eb.comm.hotp.authHotpUserRequest(reqConfig);
         request.configure(userConfig);
         request.configure(endpointConfig);
 
