@@ -52,6 +52,12 @@
                 <span>Optional password for password authentication. If filled in, password authentication will be another
                 authentication method, alongside HOTP. If left empty, the only auth method is HOTP.</span>
             </label>
+
+            <label>HOTP digits
+                <input type="text" name="hotpDigits" id="hotpDigits" value="6"/>
+                <span>Number of digits in HOTP code.
+                </span>
+            </label>
         </div>
 
         <div class="section"><span>2</span>Configuration</div>
@@ -101,12 +107,6 @@
             <label>MAC key
                 <input type="text" name="macKey" id="macKey" value="2224262820223456789012345678901234567890123456789012345678901234"/>
                 <span>Hexcoded hmac API key
-                </span>
-            </label>
-
-            <label>HOTP digits
-                <input type="text" name="hotpDigits" id="hotpDigits" value="6"/>
-                <span>Number of digits in HOTP code
                 </span>
             </label>
         </div>
