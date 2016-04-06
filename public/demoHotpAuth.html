@@ -26,8 +26,8 @@
     <script>
         "use strict";
         var defaults = {
-            uoidHotp: 5588,
-            uoidPasswd: 5599,
+            uoidHotp: '5588',
+            uoidPasswd: '5599',
             methodHotp:'AUTH_HOTP',
             methodPasswd:'AUTH_PASSWD',
             site: 'site2.enigmabridge.com',
@@ -62,9 +62,6 @@
             <div id="hotpCodeDiv" class="hotpCode"></div>
             <div class="button-section">
                 <input type="button" id="btnGenerate" value="Generate"/>
-                <!-- Buggy counter computation not needed anymore. FIXED on the server side.
-                <input type="button" id="btnGenerateBug" value="Generate - with ctr bug"/>
-                -->
             </div>
         </div>
 
@@ -280,50 +277,17 @@
         return (x.length<16) ? (('0'.repeat(16-x.length))+x) : x
     }
 
-    function revHex(x){
-        if ((x.length & 1) == 1){
-            x = '0'+x;
-        }
-
-        var ln = x.length;
-        var z = "";
-        var i;
-        for(i=0; i<ln; i+=2){
-            z += x.substring(ln-i-2, ln-i);
-        }
-
-        return z;
-    }
-
-    function generate(bugCtr){
-        bugCtr = bugCtr || false;
-
+    function generate(){
         var digits = $('#hotpDigits').val();
         var hotpSecret = $('#hotpSecret').val();
         var hotpSecretBits = sjcl.codec.hex.toBits(hotpSecret);
         var hotpCtr = pad8b($('#hotpCtr').val());
         var bn = new sjcl.bn(hotpCtr);
 
-        // Initial conversion.
-        if (bugCtr && !bn.greaterEquals(new sjcl.bn('100000000000000'))){
-            hotpCtr = revHex(pad8b(hotpCtr));
-            console.log("Initial conversion to: " + hotpCtr);
-        }
-
         // Compute HOTP code.
         var hotpCode = eb.comm.hotp.hotpCompute(hotpSecretBits, hotpCtr, digits);
         var hotpCodeStr = sprintf("%0"+digits+"d", hotpCode);
-
-        // Incrementation.
-        if (bugCtr){
-            bn = new sjcl.bn(revHex(hotpCtr));
-            hotpCtr = revHex(pad8b(bn.addM(1).toString().replace(/^0x/, '')));
-
-        } else {
-            bn = new sjcl.bn(hotpCtr);
-            hotpCtr = pad8b(bn.addM(1).toString().replace(/^0x/, ''));
-
-        }
+        hotpCtr = pad8b(bn.addM(1).toString().replace(/^0x/, ''));
 
         $("#password").val('');
         $('#hotpCtr').val(hotpCtr);
@@ -496,10 +460,6 @@
 
         $('#btnGenerate').click(function(){
             generate();
-        });
-
-        $('#btnGenerateBug').click(function(){
-            generate(true);
         });
     });
 
