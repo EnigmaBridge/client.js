@@ -3532,6 +3532,10 @@ eb.comm.hotp.authHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
     hotpLength: eb.comm.hotp.HOTP_DIGITS_DEFAULT,
     passwd: undefined,
 
+    // Private variables, request configures response parser.
+    authMethod: undefined,
+    authFlag: undefined,
+
     /**
      * Process HOTP configuration.
      * @param hotpObject hotp object
@@ -3563,15 +3567,17 @@ eb.comm.hotp.authHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
             throw new eb.exception.invalid("Authentication supports only one authentication method at a time");
         }
 
-        var authCode, authMethod;
+        var authCode;
         if (this.passwd && this.passwd.length > 0){
             authCode = this.passwd;
-            authMethod = eb.comm.hotp.TLV_TYPE_PASSWORDHASH;
+            this.authMethod = eb.comm.hotp.TLV_TYPE_PASSWORDHASH;
+            this.authFlag = eb.comm.hotp.USERAUTH_FLAG_PASSWD;
             this._log("Using Password authentication");
 
         } else if (this.hotpCode) {
             authCode = eb.comm.hotp.hotpCodeToHexCoded(this.hotpCode, this.hotpLength);
-            authMethod = eb.comm.hotp.TLV_TYPE_HOTPCODE;
+            this.authMethod = eb.comm.hotp.TLV_TYPE_HOTPCODE;
+            this.authFlag = eb.comm.hotp.USERAUTH_FLAG_HOTP;
             this._log("Using HOTP authentication");
 
         } else {
@@ -3583,7 +3589,7 @@ eb.comm.hotp.authHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
             this.userId,
             authCode,
             this.userCtx,
-            authMethod);
+            this.authMethod);
 
         this._log("HOTP Auth request: " + sjcl.codec.hex.fromBits(upperRequest));
 
@@ -3599,8 +3605,14 @@ eb.comm.hotp.authHotpUserRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
      */
     subDone: function(response, requestObj, data){
         var parser = new eb.comm.hotp.hotpUserAuthResponseParser();
+        var options = {
+            userId: this.userId,
+            tlvOp:  this.authMethod,
+            methods:this.authFlag
+        };
+
         try {
-            this.response = response = parser.parse(response.protectedData, response, {'userId' : this.userId});
+            this.response = response = parser.parse(response.protectedData, response, options);
             if (response.hotpStatus == eb.comm.status.SW_STAT_OK) {
                 if (this.doneCallbackOrig) {
                     this.doneCallbackOrig(response, requestObj, data);
