@@ -81,13 +81,15 @@
             </label>
 
             <label>HOTP code
-                <input type="text" name="hotpCode" id="hotpCode" placeholder="123 456"/>
+                <input type="text" name="hotpCode" id="hotpCode" placeholder="123456"/>
                 <span>HOTP code to authenticate with. If entered, HOTP authentication method will be used.</span>
             </label>
 
             <label>Password
-                <input type="text" name="password" id="password" placeholder="lorem ipsum"/>
-                <span>Password authenticate with. If entered, password authentication method will be used.</span>
+                <input type="text" name="password" id="password" placeholder="user password"/>
+                <span>Password to authenticate with. If entered, password authentication method will be used instead of HOTP.
+                Only one authentication method can be used at a time. In order to edit this field,
+                    please <a onclick="$('#hotpCode').val('').keyup();">empty the field above (HOTP)</a>.</span>
             </label>
         </div>
 
