@@ -234,11 +234,27 @@
 
     function finished(response){
         var digits = $('#hotpDigits').val();
-        $('#hotpStatus').val(sprintf("%04X", response.hotpStatus));
-        if (response.hotpStatus == eb.comm.status.SW_STAT_OK){
-            $('#hotpStatus').css({ 'background': '#ddffdd' });
+
+        var statusElem = $('#hotpStatus');
+        var responseStatus = response.hotpStatus;
+        if ((responseStatus === undefined || responseStatus == 0x0) && response.statusCode != eb.comm.status.SW_STAT_OK){
+            responseStatus = response.statusCode;
+        }
+
+        var status = sprintf("0x%04X", responseStatus);
+        if (responseStatus == eb.comm.status.SW_STAT_OK){
+            status += ' - Context created successfully';
+        } else if (responseStatus == eb.comm.status.SW_AUTHMETHOD_NOT_ALLOWED){
+            status += ' - Failed, authentication method not allowed';
         } else {
-            $('#hotpStatus').css({ 'background': '#ffdddd' });
+            status += ' - Failed, unknown error';
+        }
+
+        statusElem.val(status);
+        if (response.hotpStatus == eb.comm.status.SW_STAT_OK){
+            statusElem.css({ 'background': '#ddffdd' });
+        } else {
+            statusElem.css({ 'background': '#ffdddd' });
         }
 
         if (response.hotpUserId){
@@ -370,6 +386,7 @@
                 JSON.stringify(request.getSocketRequest())));
 
         // Do the call.
+        $('#hotpStatus').val('...');
         request.doRequest();
     }
 

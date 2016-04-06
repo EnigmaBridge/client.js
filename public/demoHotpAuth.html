@@ -358,21 +358,30 @@
 
     function finished(response){
         var statusElem = $('#hotpStatus');
-        var status = sprintf("%04X", response.hotpStatus);
-        if (response.hotpStatus == eb.comm.status.SW_STAT_OK){
+        var responseStatus = response.hotpStatus;
+        if ((responseStatus === undefined || responseStatus == 0x0) && response.statusCode != eb.comm.status.SW_STAT_OK){
+            responseStatus = response.statusCode;
+        }
+
+        var status = sprintf("0x%04X", responseStatus);
+        if (responseStatus == eb.comm.status.SW_STAT_OK){
             status += ' - Authenticated successfully';
-        } else if (response.hotpStatus == eb.comm.status.SW_AUTH_TOO_MANY_FAILED_TRIES){
+        } else if (responseStatus == eb.comm.status.SW_AUTH_TOO_MANY_FAILED_TRIES){
             status += ' - Failed, too many attempts';
-        } else if (response.hotpStatus == eb.comm.status.SW_HOTP_TOO_MANY_FAILED_TRIES){
+        } else if (responseStatus == eb.comm.status.SW_HOTP_TOO_MANY_FAILED_TRIES){
             status += ' - Failed, too many HOTP attempts';
-        } else if (response.hotpStatus == eb.comm.status.SW_HOTP_WRONG_CODE) {
+        } else if (responseStatus == eb.comm.status.SW_HOTP_WRONG_CODE) {
             status += ' - Failed, invalid HOTP code';
-        } else if (response.hotpStatus == eb.comm.status.SW_WRONG_PASSWD){
+        } else if (responseStatus == eb.comm.status.SW_WRONG_PASSWD){
             status += ' - Failed, invalid password';
-        } else if (response.hotpStatus == eb.comm.status.SW_PASSWD_INVALID_LENGTH){
+        } else if (responseStatus == eb.comm.status.SW_PASSWD_INVALID_LENGTH){
             status += ' - Failed, invalid password length';
-        } else if (response.hotpStatus == eb.comm.status.SW_PASSWD_TOO_MANY_FAILED_TRIES){
+        } else if (responseStatus == eb.comm.status.SW_PASSWD_TOO_MANY_FAILED_TRIES){
             status += ' - Failed, too many password attempts';
+        } else if (responseStatus == eb.comm.status.SW_AUTHMETHOD_NOT_ALLOWED){
+            status += ' - Failed, authentication method not allowed';
+        } else if (responseStatus == eb.comm.status.SW_INVALID_TLV_FORMAT){
+            status += ' - Failed, invalid auth request (empty password or HOTP?)';
         } else {
             status += ' - Failed, unknown error';
         }
@@ -460,6 +469,7 @@
                 JSON.stringify(request.getSocketRequest())));
 
         // Do the call.
+        $('#hotpStatus').val('...');
         request.doRequest();
     }
 
