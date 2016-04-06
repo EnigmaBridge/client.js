@@ -135,3 +135,22 @@
     margin-top: 10px;
     text-align: right;
 }
+.collapser {
+    padding: 5px;
+    display: inline;
+    font: normal 16px "Courier New", serif;
+}
+.logbox {
+    background-color: #2A88AD;
+    padding: 10px 10px 10px 10px;
+    font-family: monospace;
+    margin-top: 10px;
+    margin-right: 10px;
+    color: #f9f9f9;
+    overflow: auto;
+    width: 99%;
+    white-space: pre-wrap;       /* CSS 3 */
+    white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+    white-space: -o-pre-wrap;    /* Opera 7 */
+    word-wrap: break-word;       /* Internet Explorer 5.5+ */
+}
