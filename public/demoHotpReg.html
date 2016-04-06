@@ -191,11 +191,11 @@
 
     $('#divConfigHead').click();
     function set_request(msg){
-        $("#reqRest")[0].innerHTML = msg;
+        $("#reqRest").html(msg);
     }
 
     function display_message(msg) {
-        $("#status")[0].innerHTML = msg;
+        $("#status").html(msg);
     }
 
     function formatDate(date) {
