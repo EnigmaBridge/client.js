@@ -4,10 +4,15 @@
     <meta charset="UTF-8">
     <title>Enigma Bridge REST demo</title>
     <style>
-        body,div,p,a,td,input {font-family: Arial, Helvetica, sans-serif; font-size: 10pt;}
+        body,p,td,input {font-family: Arial, Helvetica, sans-serif; font-size: 10pt;}
         h1 {font-size: 14pt; }
         h2 {font-size: 12pt; }
         #footer {font-size: 8pt; text-align: center; padding: 0 10px 10px 10px}
+        .collapser {
+            padding: 5px;
+            display: inline;
+            font: normal 16px "Courier New", serif;
+        }
         .hotpCode{
             padding: 0px 10px 15px 10px;
             font-size: 24pt;
@@ -103,8 +108,12 @@
             </label>
         </div>
 
-        <div class="section"><span>3</span>Configuration</div>
-        <div class="inner-wrap">
+        <div class="section" id="divConfigHead">
+            <span>3</span>
+            Configuration
+            <div class="collapser">[-]</div>
+        </div>
+        <div class="inner-wrap" id="divConfig">
             <label>API Key
                 <input type="text" name="apiKey" id="apiKey" value="TEST_API"/>
                 <span>Your EB API key</span>
@@ -195,6 +204,19 @@
 <script>
     "use strict";
     $('#endpoint').val(defaults.site);
+    $('#divConfigHead').click(toggleCategory);
+    function toggleCategory(){
+        var header = $(this);
+        var collapser = header.find('.collapser');
+        var content = header.next();
+        content.slideToggle(500, function () {
+            collapser.text(function () {
+                return content.is(":visible") ? "[-]" : "[+]";
+            });
+        });
+    }
+
+    $('#divConfigHead').click();
 
     // Shortcuts.
     var ahotp = $("#hotpCode");
