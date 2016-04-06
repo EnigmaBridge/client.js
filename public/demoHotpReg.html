@@ -208,6 +208,19 @@
         append_message(msg);
     }
 
+    function successBg(x, success){
+        if (success === undefined){
+            x.removeClass('successBg');
+            x.removeClass('failedBg');
+        } else if (success){
+            x.addClass('successBg');
+            x.removeClass('failedBg');
+        } else {
+            x.removeClass('successBg');
+            x.addClass('failedBg');
+        }
+    }
+
     /**
      * Get settings from the form.
      * @returns {{remoteEndpoint: (*|jQuery), remotePort: number, requestMethod: (*|jQuery), requestScheme: (*|jQuery), requestTimeout: number, debuggingLog: boolean}}
@@ -232,6 +245,21 @@
         };
     }
 
+    function connectionError(data){
+        $('#qrcode').html("");
+        $('#qrcode2').html("");
+        $('#userId').val("");
+        $('#hotpSecret').val("");
+        $('#htops').val("");
+        $('#qrLink').val("");
+        $('#userCtx').val("");
+        $('#redirBlock').hide('slow');
+
+        var statusElem = $('#hotpStatus');
+        statusElem.val("Connection error");
+        successBg(statusElem, false);
+    }
+
     function finished(response){
         var digits = $('#hotpDigits').val();
 
@@ -251,11 +279,7 @@
         }
 
         statusElem.val(status);
-        if (response.hotpStatus == eb.comm.status.SW_STAT_OK){
-            statusElem.css({ 'background': '#ddffdd' });
-        } else {
-            statusElem.css({ 'background': '#ffdddd' });
-        }
+        successBg(statusElem, response.hotpStatus == eb.comm.status.SW_STAT_OK);
 
         if (response.hotpUserId){
             $('#userId').val(sjcl.codec.hex.fromBits(eb.comm.hotp.userIdToBits(response.hotpUserId)));
@@ -264,7 +288,7 @@
         if (response.hotpKey){
             $('#hotpSecret').val(sjcl.codec.hex.fromBits(response.hotpKey));
 
-            // HOTP codes.
+            // HOTP codes - compute first 5, demo that it works.
             var i, codes=[];
             for(i=0; i<5; i++){
                 codes.push(""+eb.comm.hotp.hotpCompute(response.hotpKey, i, digits));
@@ -301,7 +325,7 @@
             $('#qrcode2').qrcode(qrLink2);
 
             // Auth link.
-            $('#redirBlock').show();
+            $('#redirBlock').show('slow');
             $('#redirHref').attr("href", sprintf("demoHotpAuth.html?key=%s&userId=%s&userCtx=%s&digits=%d",
                     sjcl.codec.hex.fromBits(response.hotpKey),
                     sjcl.codec.hex.fromBits(response.hotpUserId),
@@ -373,6 +397,10 @@
 
         }).fail(function(failType, data){
             log("fail! type=" + failType + ", response="+(data && data.response ? data.response.toString() : 'undefined')+"\n data=" + JSON.stringify(data));
+            if (failType == eb.comm.status.PDATA_FAIL_CONNECTION){
+                log("Connection error");
+                connectionError(data);
+            }
 
         }).always(function(request, data){
             log("it is over...");
@@ -387,6 +415,7 @@
 
         // Do the call.
         $('#hotpStatus').val('...');
+        successBg($('#hotpStatus'));
         request.doRequest();
     }
 

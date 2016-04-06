@@ -266,6 +266,19 @@
         append_message(msg);
     }
 
+    function successBg(x, success){
+        if (success === undefined){
+            x.removeClass('successBg');
+            x.removeClass('failedBg');
+        } else if (success){
+            x.addClass('successBg');
+            x.removeClass('failedBg');
+        } else {
+            x.removeClass('successBg');
+            x.addClass('failedBg');
+        }
+    }
+
     function getSettings(){
         var apiKey = $('#apiKey').val();
         var keyId = parseInt($('#userObjectID').val(), 16);
@@ -356,6 +369,12 @@
         fixAuthFields();
     }
 
+    function connectionError(data){
+        var statusElem = $('#hotpStatus');
+        statusElem.val("Connection error");
+        successBg(statusElem, false);
+    }
+
     function finished(response){
         var statusElem = $('#hotpStatus');
         var responseStatus = response.hotpStatus;
@@ -387,11 +406,7 @@
         }
 
         statusElem.val(status);
-        if (response.hotpStatus == eb.comm.status.SW_STAT_OK){
-            statusElem.css({ 'background': '#ddffdd' });
-        } else {
-            statusElem.css({ 'background': '#ffdddd' });
-        }
+        successBg(statusElem, response.hotpStatus == eb.comm.status.SW_STAT_OK);
 
         if (response.hotpUserCtx){
             $('#newUserCtx').val(sjcl.codec.hex.fromBits(response.hotpUserCtx));
@@ -452,9 +467,13 @@
 
         }).fail(function(failType, data){
             log("fail! type=" + failType);
-            if (failType == 0x2){
+            if (failType == eb.comm.status.PDATA_FAIL_RESPONSE_FAILED){
                 log("Fail msg: " + data.response.toString());
                 finished(data.response);
+
+            } else if (failType == eb.comm.status.PDATA_FAIL_CONNECTION){
+                log("Connection error");
+                connectionError(data);
             }
 
         }).always(function(request, data){
@@ -470,6 +489,7 @@
 
         // Do the call.
         $('#hotpStatus').val('...');
+        successBg($('#hotpStatus'));
         request.doRequest();
     }
 
