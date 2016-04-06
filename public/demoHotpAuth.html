@@ -383,6 +383,7 @@
         var aesKey = $('#aesKey').val();
         var macKey = $('#macKey').val();
         var pDataMethod = $('#processDataMethod').val();
+        var body = $("body");
 
         // Flush old messages.
         display_message("");
@@ -439,6 +440,7 @@
 
         }).always(function(request, data){
             log("it is over...");
+            body.removeClass("loading");
         });
 
         // Build the request so we can display request in the form.
@@ -451,6 +453,8 @@
         // Do the call.
         $('#hotpStatus').val('...');
         successBg($('#hotpStatus'));
+        body.addClass("loading");
+
         request.doRequest();
     }
 
@@ -498,6 +502,6 @@
     });
 
 </script>
-
+<div class="modal"><!-- Place at bottom of page --></div>
 </body>
 </html>
