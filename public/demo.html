@@ -29,6 +29,7 @@
     <script src="sjcl.js"></script>
     <script src="he.js"></script>
     <script src="enigma.js"></script>
+    <script src="demo.js"></script>
 </head>
 <body>
 
@@ -144,29 +145,6 @@
     // UO Key: 11223344556677889900aabbccddeeff
     // CommKeyENC: e134567890123456789012345678901234567890123456789012345678901234
     // CommKeyMAC: e224262820223456789012345678901234567890123456789012345678901234
-
-    function set_request(msg){
-        $("#reqRest").html(msg);
-    }
-
-    function display_message(msg) {
-        $("#status").html(msg);
-    }
-
-    function formatDate(date) {
-        var hours = date.getHours();
-        var minutes = date.getMinutes();
-        var sec = date.getSeconds();
-        var milli = date.getMilliseconds();
-        var strTime = sprintf("%02d:%02d:%02d.%03d", hours, minutes, sec, milli);
-        return date.getMonth()+1 + "/" + date.getDate() + "/" + date.getFullYear() + " " + strTime;
-    }
-
-    function append_message(msg) {
-        var status = $("#status");
-        var newMsg = formatDate(new Date()) + " - " + he.encode(msg);
-        status.html(status.html() + "<br/>\n" + newMsg);
-    }
 
     function pkcs7pad(data){
         return sjcl.codec.hex.fromBits(eb.padding.pkcs7.pad(sjcl.codec.hex.toBits(data)));
