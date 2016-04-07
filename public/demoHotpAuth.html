@@ -165,7 +165,8 @@
             <label>Updated user context
                 <input type="text" name="newUserCtx" id="newUserCtx" placeholder="binary blob"/>
                 <span>User context updated by the service, used for further authentication requests.
-                <a onclick="updateCtx()">Update context in the request</a>
+                <a onclick="updateCtx()">Update context in the request</a><br/>
+                <a href="#" id="redirHref" target="_blank">Update auth context (e.g., password reset)</a>
                 </span>
             </label>
         </div>
@@ -263,6 +264,15 @@
         };
     }
 
+    function updateCtxHref(){
+        $('#redirHref').attr("href", sprintf("demoHotpUpdate.html?key=%s&userId=%s&userCtx=%s&digits=%s",
+                $('#hotpSecret').val(),
+                $('#userId').val(),
+                $('#userCtx').val(),
+                $('#hotpDigits').val()
+        ));
+    }
+
     function updateCtx(){
         var newCtx = $('#newUserCtx').val();
         if (!newCtx || newCtx.length==0){
@@ -271,6 +281,7 @@
         }
 
         $('#userCtx').val(newCtx);
+        updateCtxHref();
     }
 
     function pad8b(x){
@@ -342,6 +353,8 @@
         if (updateCtxFlag){
             updateCtx();
         }
+
+        updateCtxHref();
     }
 
     function requestSimple(){
