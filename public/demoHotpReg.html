@@ -256,7 +256,7 @@
 
             // HOTP codes - compute first 5, demo that it works.
             var i, codes=[];
-            for(i=0; i<5; i++){
+            for(i=1; i<=5; i++){
                 codes.push(""+eb.comm.hotp.hotpCompute(response.hotpKey, i, digits));
             }
 
