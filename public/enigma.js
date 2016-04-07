@@ -2882,7 +2882,7 @@ eb.comm.hotp = {
      * Auth context update response parser constuctor.
      */
     updateAuthContextResponseParser: function(options){
-        this.configure(options);
+
     },
 
     /**
@@ -3227,10 +3227,10 @@ eb.comm.hotp.updateAuthContextRequestBuilder.inheritsFrom(eb.comm.base, {
         var hex = sjcl.codec.hex;
         this.configure(options);
 
-        var userId = options && options.userId;
-        var userCtx = options && options.userCtx;
-        var passwd = options && options.passwd;
-        var targetMethod = options && options.targetMethod;
+        var userId = this.defaults.userId;
+        var userCtx = this.defaults.userCtx;
+        var passwd = this.defaults.passwd;
+        var targetMethod = this.defaults.targetMethod;
         if (!userId || !userCtx || !targetMethod){
             throw new eb.exception.invalid("User ID / userCtx / targetMethod undefined");
         }
@@ -3252,7 +3252,7 @@ eb.comm.hotp.updateAuthContextRequestBuilder.inheritsFrom(eb.comm.base, {
 
         // Method #2 - Password
         if (targetMethod == eb.comm.hotp.USERAUTH_FLAG_PASSWD){
-            var passwordBits = eb.comm.inputToBits(passwd);
+            var passwordBits = eb.misc.inputToBits(passwd);
             updateCtx = ba.concat(updateCtx, hex.toBits(sprintf("%02x%04x", eb.comm.hotp.USER_AUTH_TYPE_PASSWD, ba.bitLength(passwordBits)/8)));
             updateCtx = ba.concat(updateCtx, passwordBits);
         }
