@@ -8,12 +8,14 @@
         h1 {font-size: 14pt; }
         h2 {font-size: 12pt; }
         .qr {
-            float: left;
-            padding: 10px;
-            overflow:hidden;
+            padding-top: 10px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            text-align: center;
         }
         .qrWrap {
-            overflow: auto;
+            /*overflow: auto;*/
         }
     </style>
     <link href='http://fonts.googleapis.com/css?family=Bitter' rel='stylesheet' type='text/css'/>
@@ -149,7 +151,6 @@
 
             <div class="qrWrap">
                 <div id="qrcode" class="qr"></div>
-                <div id="qrcode2" class="qr"></div>
             </div>
         </div>
         <div class="button-section">
@@ -262,20 +263,6 @@
 
             $('#htops').val(codes.join(" "));
 
-            // QR link code.
-            var qrLink = eb.comm.hotp.hotpGetQrLink(response.hotpKey, {
-                        label: sjcl.codec.hex.fromBits(response.hotpUserId),
-                        web: "demo.enigmabridge.com",
-                        issuer: "EnigmaBridge",
-                        digits: digits,
-                        ctr:0
-            });
-            $('#qrLink').val(qrLink);
-
-            // QR code...
-            $('#qrcode').html("");
-            $('#qrcode').qrcode(qrLink);
-
             // QR code for picky iPhones.
             var qrLink2 = eb.comm.hotp.hotpGetQrLink(response.hotpKey, {
                 label: sjcl.codec.hex.fromBits(response.hotpUserId),
@@ -285,10 +272,11 @@
                 digits: digits,
                 stripPadding: true
             });
+            $('#qrLink').val(qrLink2);
             log("QR link2: " + qrLink2);
 
-            $('#qrcode2').html("");
-            $('#qrcode2').qrcode(qrLink2);
+            $('#qrcode').html("");
+            $('#qrcode').qrcode(qrLink2);
 
             // Auth link.
             $('#redirBlock').show('slow');
