@@ -3303,7 +3303,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
 
         // Options.
         var defaults = {
-            tlvOp: eb.comm.hotp.TLV_TYPE_NEWAUTHCONTEXT,
+            tlvOp: undefined,
             methods: 0x0,
             bIsLocalCtxUpdate: true,
             userId: undefined,
@@ -3317,6 +3317,9 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         var givenUserId = options && options.userId;
         var response = resp || (options && options.response);
         response = response || new eb.comm.hotp.hotpResponse();
+        if (tlvOp === undefined){
+            throw new eb.exception.corrupt("Main TLV operation undefined");
+        }
 
         this.response = response;
         response.hotpStatus = 0x0;
