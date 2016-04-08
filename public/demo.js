@@ -43,4 +43,16 @@ function getURLParameter(name) {
     return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null;
 }
 
+function toggleCategory(){
+    var header = $(this);
+    var collapser = header.find('.collapser');
+    var content = header.next();
+    content.slideToggle(500, function () {
+        collapser.text(function () {
+            return content.is(":visible") ? "[-]" : "[+]";
+        });
+    });
+}
+
+
 

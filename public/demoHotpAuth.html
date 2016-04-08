@@ -188,17 +188,6 @@
     "use strict";
     $('#endpoint').val(defaults.site);
     $('#divConfigHead').click(toggleCategory);
-    function toggleCategory(){
-        var header = $(this);
-        var collapser = header.find('.collapser');
-        var content = header.next();
-        content.slideToggle(500, function () {
-            collapser.text(function () {
-                return content.is(":visible") ? "[-]" : "[+]";
-            });
-        });
-    }
-
     $('#divConfigHead').click();
 
     // Shortcuts.
