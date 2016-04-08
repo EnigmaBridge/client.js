@@ -124,6 +124,22 @@
                 </span>
             </label>
         </div>
+        <div class="section"><span>3</span>Response</div>
+        <div class="inner-wrap">
+            <label>Status code
+                <input type="text" name="responseStatus" id="responseStatus" placeholder="Response status code"/>
+                <span>9000 means success</span>
+            </label>
+
+            <label>Response time
+                <input type="text" name="responseTime" id="responseTime" placeholder="time in milliseconds"/>
+            </label>
+
+            <label>Response
+                <textarea name="response" id="response" placeholder="Response" rows="3"></textarea>
+            </label>
+
+        </div>
         <div class="button-section">
             <input type="button" id="btnProcessData" value="ProcessData"/>
             <input type="button" id="btnProcessDataPadding" value="ProcessData (padding)"/>
@@ -140,10 +156,7 @@
 
 <script>
     "use strict";
-    // Use server.js to start a new static page server with CORS (cross domain resource sharing).
-    // UO Key: 11223344556677889900aabbccddeeff
-    // CommKeyENC: e134567890123456789012345678901234567890123456789012345678901234
-    // CommKeyMAC: e224262820223456789012345678901234567890123456789012345678901234
+    var statusElement = $('#responseStatus');
 
     function pkcs7pad(data){
         return sjcl.codec.hex.fromBits(eb.padding.pkcs7.pad(sjcl.codec.hex.toBits(data)));
@@ -166,10 +179,6 @@
         append_message(msg);
     }
 
-    /**
-     * Get settings from the form.
-     * @returns {{remoteEndpoint: (*|jQuery), remotePort: number, requestMethod: (*|jQuery), requestScheme: (*|jQuery), requestTimeout: number, debuggingLog: boolean}}
-     */
     function getSettings(){
         var apiKey = $('#apiKey').val();
         var keyId = parseInt($('#userObjectID').val(), 16);
@@ -188,6 +197,34 @@
             apiKeyLow4Bytes: keyId,
             userObjectId : keyId
         };
+    }
+
+    function setTime(element, requestObj){
+        element.val(requestObj.requestTime + ' ms');
+    }
+
+    function connectionError(data){
+        $('#response').val("");
+
+        statusElement.val("Connection error");
+        successBg(statusElement, false);
+    }
+
+    function finished(response){
+        var responseStatus = response.statusCode;
+        var status = sprintf("0x%04X", responseStatus);
+        if (responseStatus == eb.comm.status.SW_STAT_OK){
+            status += ' - Request successful';
+        } else {
+            status += ' - Failed, unknown error';
+        }
+
+        statusElement.val(status);
+        successBg(statusElement, responseStatus == eb.comm.status.SW_STAT_OK);
+
+        if (response.protectedData){
+            $('#response').val(sjcl.codec.hex.fromBits(response.protectedData));
+        }
     }
 
     function requestSimple(dataInp, plainDataInp, doPadding){
@@ -230,13 +267,22 @@
         // Callbacks settings.
         request.done(function(response, requestObj, data) {
             console.log("DONE! " + h.fromBits(response.protectedData));
+            finished(response);
 
         }).fail(function(failType, data){
             console.log("fail! type=" + failType);
+            if (failType == eb.comm.status.PDATA_FAIL_RESPONSE_FAILED){
+                finished(data.response);
+
+            } else if (failType == eb.comm.status.PDATA_FAIL_CONNECTION){
+                log("Connection error");
+                connectionError(data);
+            }
 
         }).always(function(request, data){
-            console.log("it is over...");
+            setTime($('#responseTime'), data.requestObj);
             body.removeClass("loading");
+
         });
 
         // Build the request so we can display request in the form.
