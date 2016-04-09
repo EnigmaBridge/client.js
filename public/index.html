@@ -70,27 +70,38 @@
     <div class="bloc l-bloc bgc-white tc-outer-space" id="generalcrypto">
         <div class="container bloc-lg">
             <div class="row">
-                <div class="col-sm-12">
+                <p class="col-sm-12">
                     <h2 class="mg-md tc-rich-electric-blue">
                         <strong>API test cases</strong>
                     </h2>
                     <p class="mg-md">
-                        You can try our API live fro your browser.
+                        You can try our API live from your browser.
                     </p>
 
+                    <h3>Encryption</h3>
                     <ul>
                         <li><a href="demoCert.html">Get Certificate</a> call, simplest API call</li>
-                        <li><a href="demo.html">General ProcessData</a> demo</li>
-                        <li><a href="demoHotpReg.html">User Authentication - create a new user</a> demo</li>
-                        <li><a href="demoHotpAuth.html?key=8cbb6c52f0b149f8646b078e02f10b72&userId=966b21276dfa53cf&userCtx=cc2cfe3fabdb921132960f90dcbe132a933926f03f9699742b430ff1a84598c9caad2c2b3f457bcd774effa8cee212ba263e2cd89bc95ff70d3864ca451a8770&digits=6">
-                            User Authentication - authenticate</a> demo
-                        </li>
-                        <li><a href="demoHotpUpdate.html?key=8cbb6c52f0b149f8646b078e02f10b72&userId=966b21276dfa53cf&userCtx=cc2cfe3fabdb921132960f90dcbe132a933926f03f9699742b430ff1a84598c9caad2c2b3f457bcd774effa8cee212ba263e2cd89bc95ff70d3864ca451a8770&digits=6#">
-                            User Authentication - update</a> demo (e.g., password reset, HOTP reinit)
-                        </li>
+                        <li><a href="demoEncrypt.html">Encryption</a> (AES-256, RSA-1024, RSA-2048) demo</li>
                     </ul>
 
 
+                    <h3>Authentication</h3>
+                    User Authentication with <a href="https://tools.ietf.org/html/rfc4226">HOTP</a> and Password.
+                    HOTP can be used with Google Authenticator.
+                    <ul>
+                        <li><a href="demoHotpReg.html">Create a new user</a> demo</li>
+                        <li><a href="demoHotpAuth.html?key=8cbb6c52f0b149f8646b078e02f10b72&userId=966b21276dfa53cf&userCtx=cc2cfe3fabdb921132960f90dcbe132a933926f03f9699742b430ff1a84598c9caad2c2b3f457bcd774effa8cee212ba263e2cd89bc95ff70d3864ca451a8770&digits=6">
+                            User Authentication</a> demo
+                        </li>
+                        <li><a href="demoHotpUpdate.html?key=8cbb6c52f0b149f8646b078e02f10b72&userId=966b21276dfa53cf&userCtx=cc2cfe3fabdb921132960f90dcbe132a933926f03f9699742b430ff1a84598c9caad2c2b3f457bcd774effa8cee212ba263e2cd89bc95ff70d3864ca451a8770&digits=6#">
+                            User context update</a> demo (e.g., password reset, HOTP re-initialization)
+                        </li>
+                    </ul>
+
+                    <h3>Raw API</h3>
+                    <ul>
+                        <li><a href="demo.html">General ProcessData</a> demo</li>
+                    </ul>
                 </div>
             </div>
         </div>

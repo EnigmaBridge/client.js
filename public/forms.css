@@ -138,6 +138,12 @@
     margin-top: 10px;
     text-align: right;
 }
+.inner-wrap .button-fix input[type="button"]{
+    width: 150px;
+}
+.inner-wrap h4 {
+    margin-bottom: 0;
+}
 .collapser {
     padding: 5px;
     display: inline;
