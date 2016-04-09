@@ -47,7 +47,7 @@
         <div class="section"><span>1</span>Input</div>
         <div class="inner-wrap">
             <label>Password
-                <input type="text" name="password" id="password" value="" placeholder="Password [optional]"/>
+                <input type="text" name="authPassword" id="authPassword" value="" placeholder="Password [optional]"/>
                 <span>Optional password for password authentication. If filled in, password authentication will be another
                 authentication method, alongside HOTP. If left empty, the only auth method is HOTP.</span>
             </label>
@@ -288,7 +288,7 @@
         var macKey = $('#macKey').val();
         var pDataMethod = $('#processDataMethod').val();
         var digits = $('#hotpDigits').val();
-        var password = $('#password').val();
+        var password = $('#authPassword').val();
         password = password ? password.trim() : '';
         var body = $("body");
 

@@ -72,7 +72,7 @@
             </label>
 
             <label>Password
-                <input type="text" name="password" id="password" placeholder="new user password"/>
+                <input type="text" name="authPassword" id="authPassword" placeholder="new user password"/>
                 <span>New password to set</span>
             </label>
         </div>
@@ -204,7 +204,7 @@
     $('#divConfigHead').click();
 
     // Password editable only if password method is selected
-    var apass = $("#password");
+    var apass = $("#authPassword");
     var upass = $("#updatePassword");
     var uhotp = $("#updateHotp");
     var uatmp = $("#updateAttempts");
@@ -363,7 +363,7 @@
 
         var userId = $('#userId').val();
         var userCtx = $('#userCtx').val();
-        var password = $('#password').val();
+        var password = $('#authPassword').val();
         var reqConfig = {hotp:{
             'userId': userId,
             'userCtx': userCtx,
