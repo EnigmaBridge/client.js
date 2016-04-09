@@ -974,6 +974,7 @@ eb.comm = {
         SW_WRONG_PASSWD:                0xa000 | 0x065,
 
         SW_STAT_OK:                     0x9000,
+        ERROR_CLASS_ERR_CHECK_ERRORS_6f:0x6f00,
 
         PDATA_FAIL_CONNECTION:          0x1,
         PDATA_FAIL_RESPONSE_PARSING:    0x3,

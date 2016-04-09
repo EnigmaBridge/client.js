@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Enigma Bridge REST demo</title>
+    <link rel="shortcut icon" type="image/png" href="favicon.png" />
+    <style>
+        body,div,p,a,td,input {font-family: Arial, Helvetica, sans-serif; font-size: 10pt;}
+        h1 {font-size: 14pt; }
+        h2 {font-size: 12pt; }
+
+        input[type=radio] {
+            display:none;
+            margin:10px;
+        }
+        input[type=radio] + label {
+            display:inline-block;
+            margin:-2px;
+            padding: 4px 12px;
+            background-color: #e7e7e7;
+            border-color: #ddd;
+        }
+        input[type=radio]:checked + label {
+            background-image: none;
+            background-color:#2A88AD;
+            color:#ffffff;
+        }
+    </style>
+    <link href='http://fonts.googleapis.com/css?family=Bitter' rel='stylesheet' type='text/css'/>
+    <link rel="stylesheet" type="text/css" href="forms.css"/>
+    <script src="jquery-1.12.1.min.js"></script>
+    <script src="sprintf.js"></script>
+    <script src="sjcl.js"></script>
+    <script src="he.js"></script>
+    <script src="enigma.js"></script>
+    <script src="demo.js"></script>
+    <script>
+        "use strict";
+        var defaults = {
+            site: 'site2.enigmabridge.com',
+            site1: 'site1.enigmabridge.com',
+            site2: 'site2.enigmabridge.com'
+        };
+
+        var gconfig = {
+            aes256:{
+                uoid:   'EE01',
+                method: 'PLAINAES',
+                encKey: 'e134567890123456789012345678901234567890123456789012345678901234',
+                macKey: 'e224262820223456789012345678901234567890123456789012345678901234',
+                blockBits: 128,
+                padding: eb.padding.pkcs7
+            },
+            rsa1024:{
+                uoid:   '7654',
+                method: 'RSA1024',
+                encKey: '1234567890123456789012345678901234567890123456789012345678901234',
+                macKey: '2224262820223456789012345678901234567890123456789012345678901234',
+                blockBits: 1024,
+                padding: eb.padding.pkcs15
+            },
+            rsa2048:{
+                uoid:   '9876',
+                method: 'RSA2048',
+                encKey: '1234567890123456789012345678901234567890123456789012345678901234',
+                macKey: '2224262820223456789012345678901234567890123456789012345678901234',
+                blockBits: 2048,
+                padding: eb.padding.pkcs15
+            }
+        };
+
+        var currentConfig = gconfig.aes256;
+    </script>
+</head>
+<body>
+
+<!-- form design: http://www.sanwebe.com/2014/08/css-html-forms-designs -->
+<div class="form-style-10">
+    <h1>EnigmaBridge API test<span>ProcessData() for encryption</span></h1>
+    <form>
+        <div class="section"><span>1</span>Function input</div>
+        <div class="inner-wrap">
+            <label>
+                Function input
+                <textarea name="data" id="data" placeholder="Function input" rows="6"></textarea>
+                <span>
+                    <a onclick="$('#data').val('6bc1bee22e409f96e93d7e117393172a');">
+                        AES-256 testvector</a>,
+                    <a onclick="$('#data').val('1122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788')">
+                        RSA-1024 testvector</a>,
+                    <a onclick="$('#data').val('0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001')">
+                        RSA-1024 one</a>,
+                    <a onclick="$('#data').val('11223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788')">
+                        RSA-2048 testvector</a>,
+                    <a onclick="$('#data').val('00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001')">
+                        RSA-2048 one</a>
+                </span>
+            </label>
+
+            <h4 style="margin-bottom: 3px">Cipher</h4>
+            <input type="radio" id="aes256" name="cipher" checked>
+            <label for="aes256">AES-256</label>
+            <input type="radio" id="rsa1024" name="cipher">
+            <label for="rsa1024">RSA-1024</label>
+            <input type="radio" id="rsa2048" name="cipher">
+            <label for="rsa2048">RSA-2048</label>
+
+            <h4 style="margin-bottom: 3px">Padding</h4>
+            <input type="radio" id="padOn" name="padding" checked>
+            <label for="padOn">ON</label>
+            <input type="radio" id="padOff" name="padding">
+            <label for="padOff">OFF</label>
+        </div>
+
+        <div class="button-section" style="margin-bottom: 20px">
+            <input type="button" id="btnProcessData" value="ProcessData"/>
+        </div>
+
+        <div class="section" id="divPaddingHead"><span>2</span>Padding tools<div class="collapser">[-]</div></div>
+        <div class="inner-wrap" id="divPadding">
+            <h4 style="margin-top: 0">PKCS #7</h4>
+            <div class="button-section button-fix">
+                <input type="button" value="PKCS#7 pad" onclick="$('#data').val(pkcs7pad($('#data').val()));"/>
+                <input type="button" value="PKCS#7 unpad" onclick="$('#data').val(pkcs7unpad($('#data').val()));"/>
+            </div>
+
+            <h4>PKCS #1.5 - 1024 bit</h4>
+            <div class="button-section button-fix">
+                <input type="button" value="PKCS#1.5 pad" onclick="$('#data').val(pkcs15pad($('#data').val(),1024/8));"/>
+                <input type="button" value="PKCS#1.5 unpad" onclick="$('#data').val(pkcs15unpad($('#data').val(),1024/8));"/>
+            </div>
+
+            <h4>PKCS #1.5 - 2048 bit</h4>
+            <div class="button-section button-fix">
+                <input type="button" value="PKCS#1.5 pad" onclick="$('#data').val(pkcs15pad($('#data').val(),2048/8));"/>
+                <input type="button" value="PKCS#1.5 unpad" onclick="$('#data').val(pkcs15unpad($('#data').val(),2048/8));"/>
+            </div>
+        </div>
+
+        <div class="section" id="divConfigHead">
+            <span>3</span>
+            Configuration
+            <div class="collapser">[-]</div>
+        </div>
+        <div class="inner-wrap" id="divConfig">
+            <label>API Key
+                <input type="text" name="apiKey" id="apiKey" value="TEST_API"/>
+                <span>Your EB API key</span>
+            </label>
+
+            <label>User object ID
+                <input type="text" name="userObjectID" id="userObjectID" value="EE01"/>
+                <span>Hexcoded user object ID stored in EB you want to work with.
+                    RSA-1024 decrypt: <a onclick="$('#userObjectID').val('7654');">0x7654</a>,
+                    RSA-2048 decrypt: <a onclick="$('#userObjectID').val('9876');">0x9876</a>,
+                    AES-256 encrypt: <a onclick="$('#userObjectID').val('EE01');">0xEE01</a></span>
+            </label>
+
+            <label>ProcessData method
+                <input type="text" name="processDataMethod" id="processDataMethod" value="PLAINAES"/>
+                <span><a onclick="$('#processDataMethod').val('PLAINAES');">PLAINAES</a> for operation with AES UO,
+                      <a onclick="$('#processDataMethod').val('RSA1024');">RSA1024</a> for operation with RSA-1024 UO,
+                      <a onclick="$('#processDataMethod').val('RSA2048');">RSA2048</a> for operation with RSA-2048 UO,
+                </span>
+            </label>
+
+            <label>Endpoint
+                <input type="text" name="endpoint" id="endpoint" value="site1.enigmabridge.com"/>
+                <span>Hostname of the EB API
+                    <a onclick="$('#endpoint').val(defaults.site1);">site1</a>,
+                    <a onclick="$('#endpoint').val(defaults.site2);">site2</a></span>
+            </label>
+
+            <label>Method
+                <select id="requestMethod" name="requestMethod">
+                    <option value="POST">POST</option>
+                    <option value="GET">GET</option>
+                </select>
+            </label>
+
+            <label>Scheme
+                <select id="requestScheme" name="requestScheme">
+                    <option value="https">https</option>
+                    <option value="http">http</option>
+                </select>
+            </label>
+
+            <label>AES encryption key
+                <input type="text" name="aesKey" id="aesKey" value="e134567890123456789012345678901234567890123456789012345678901234"/>
+                <span>Hexcoded encryption API key
+                    <a onclick="$('#aesKey').val('1234567890123456789012345678901234567890123456789012345678901234');">RSA comm key</a>,
+                    <a onclick="$('#aesKey').val('e134567890123456789012345678901234567890123456789012345678901234');">AES comm key</a>
+                </span>
+            </label>
+
+            <label>MAC key
+                <input type="text" name="macKey" id="macKey" value="e224262820223456789012345678901234567890123456789012345678901234"/>
+                <span>Hexcoded hmac API key
+                    <a onclick="$('#macKey').val('2224262820223456789012345678901234567890123456789012345678901234');">RSA comm key</a>
+                    <a onclick="$('#macKey').val('e224262820223456789012345678901234567890123456789012345678901234');">AES comm key</a>
+                </span>
+            </label>
+        </div>
+        <div class="section"><span>3</span>Response</div>
+        <div class="inner-wrap">
+            <label>Status code
+                <input type="text" name="responseStatus" id="responseStatus" placeholder="Response status code"/>
+                <span>9000 means success</span>
+            </label>
+
+            <label>Response time
+                <input type="text" name="responseTime" id="responseTime" placeholder="time in milliseconds"/>
+            </label>
+
+            <label>Response
+                <textarea name="response" id="response" placeholder="Response" rows="3"></textarea>
+            </label>
+        </div>
+    </form>
+</div>
+
+<label for="reqRest">Request: </label>
+<div id="reqRest" class="logbox"></div>
+<br/>
+
+<label for="status">Log: </label>
+<div id="status" class="logbox"></div>
+
+<script>
+    "use strict";
+    var statusElement = $('#responseStatus');
+    $('#divConfigHead').click(toggleCategory);
+    $('#divPaddingHead').click(toggleCategory);
+    $('#divConfigHead').click();
+    $('#divPaddingHead').click();
+    $('#endpoint').val(defaults.site);
+    $('#aes256').click(function() {cryptoSelected('aes256');});
+    $('#rsa1024').click(function() {cryptoSelected('rsa1024');});
+    $('#rsa2048').click(function() {cryptoSelected('rsa2048');});
+
+    function cryptoSelected(x){
+        currentConfig = gconfig[x];
+        $('#userObjectID').val(gconfig[x].uoid);
+        $('#processDataMethod').val(gconfig[x].method);
+        $('#aesKey').val(gconfig[x].encKey);
+        $('#macKey').val(gconfig[x].macKey);
+    }
+
+    function pkcs7pad(data){
+        return sjcl.codec.hex.fromBits(eb.padding.pkcs7.pad(sjcl.codec.hex.toBits(data)));
+    }
+
+    function pkcs15pad(data, blockLen){
+        return sjcl.codec.hex.fromBits(eb.padding.pkcs15.pad(sjcl.codec.hex.toBits(data), blockLen, 0));
+    }
+
+    function pkcs7unpad(data){
+        return sjcl.codec.hex.fromBits(eb.padding.pkcs7.unpad(sjcl.codec.hex.toBits(data)));
+    }
+
+    function pkcs15unpad(data, blockLen){
+        return sjcl.codec.hex.fromBits(eb.padding.pkcs15.unpad(sjcl.codec.hex.toBits(data), blockLen));
+    }
+
+    function log(msg){
+        console.log(msg);
+        append_message(msg);
+    }
+
+    function getSettings(){
+        var apiKey = $('#apiKey').val();
+        var keyId = parseInt($('#userObjectID').val(), 16);
+        var endpoint = $('#endpoint').val();
+        var method = $('#requestMethod').val();
+        var scheme = $('#requestScheme').val();
+
+        return {
+            remoteEndpoint: endpoint,
+            remotePort: 11180,
+            requestMethod: method,
+            requestScheme: scheme,
+            requestTimeout: 7000,
+            debuggingLog: true,
+            apiKey: apiKey,
+            apiKeyLow4Bytes: keyId,
+            userObjectId : keyId
+        };
+    }
+
+    function setTime(element, requestObj){
+        element.val(requestObj.requestTime + ' ms');
+    }
+
+    function connectionError(data){
+        $('#response').val("");
+
+        statusElement.val("Connection error");
+        successBg(statusElement, false);
+    }
+
+    function finished(response){
+        var responseStatus = response.statusCode;
+        var status = sprintf("0x%04X", responseStatus);
+        if (responseStatus == eb.comm.status.SW_STAT_OK){
+            status += ' - Request successful';
+        } else if (responseStatus == eb.comm.status.ERROR_CLASS_ERR_CHECK_ERRORS_6f) {
+            var requestDataLen = sjcl.bitArray.bitLength(sjcl.codec.hex.toBits($('#data').val() || ""));
+            if ((requestDataLen % currentConfig.blockBits) != 0){
+                status += ' - Failed, Input data seems to have an invalid length (not padded correctly)';
+            } else {
+                status += ' - Failed, crypto error.';
+            }
+        } else {
+            status += ' - Failed, unknown error';
+        }
+
+        statusElement.val(status);
+        successBg(statusElement, responseStatus == eb.comm.status.SW_STAT_OK);
+
+        if (response.protectedData){
+            $('#response').val(sjcl.codec.hex.fromBits(response.protectedData));
+        }
+    }
+
+    function requestSimple(dataInp){
+        var h = sjcl.codec.hex;
+        var aesKey = $('#aesKey').val();
+        var macKey = $('#macKey').val();
+        var pDataMethod = $('#processDataMethod').val();
+        var plainData = [];
+        var requestData = h.toBits(dataInp || ""); //sjcl.codec.utf8String.toBits(data);
+        var body = $("body");
+
+        // Flush old messages.
+        display_message("");
+        set_request("");
+
+        // Padding if enabled
+        if ($('#padOn').is(':checked')){
+            var pad = currentConfig.padding;
+            if (pad == eb.padding.pkcs15 && sjcl.bitArray.bitLength(requestData) == currentConfig.blockBits){
+                append_message("Padding enabled, but data already padded");
+            } else {
+                requestData = pad.pad(requestData, currentConfig.blockBits / 8);
+                append_message("Padded req["+pad.name+"]: " + h.fromBits(requestData));
+            }
+        }
+
+        var endpointConfig = getSettings();
+        var userConfig = {
+            aesKey: aesKey,
+            macKey: macKey,
+            callRequestType: pDataMethod
+        };
+
+        var request = new eb.comm.processData();
+        request.configure(userConfig);
+        request.configure(endpointConfig);
+
+        // Logging settings.
+        request.logger = append_message;
+
+        // Callbacks settings.
+        request.done(function(response, requestObj, data) {
+            console.log("DONE! " + h.fromBits(response.protectedData));
+            finished(response);
+
+        }).fail(function(failType, data){
+            console.log("fail! type=" + failType);
+            if (failType == eb.comm.status.PDATA_FAIL_RESPONSE_FAILED){
+                finished(data.response);
+
+            } else if (failType == eb.comm.status.PDATA_FAIL_CONNECTION){
+                log("Connection error");
+                connectionError(data);
+            }
+
+        }).always(function(request, data){
+            setTime($('#responseTime'), data.requestObj);
+            body.removeClass("loading");
+
+        });
+
+        // Build the request so we can display request in the form.
+        request.build(plainData, requestData);
+        set_request(sprintf("%s<br/>\n%s<br/>\n%s<br/>\n",
+                request.getApiUrl(),
+                JSON.stringify(request.getApiRequestData()),
+                JSON.stringify(request.getSocketRequest())));
+
+        // Do the call.
+        body.addClass("loading");
+        request.doRequest();
+    }
+
+    $(function(){
+        // Start random number collectors.
+        sjcl.random.startCollectors();
+
+        // Button click handling.
+        // in form search: $(this).find('#data').val());
+        $('#btnProcessData').click(function(){
+            requestSimple($('#data').val());
+        });
+    });
+
+</script>
+<div class="modal"><div class="modal-wrap"></div></div>
+</body>
+</html>
