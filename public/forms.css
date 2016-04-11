@@ -89,6 +89,15 @@
     -webkit-box-shadow: inset 0px 1px 1px rgba(0, 0, 0, 0.33);
 }
 
+.form-style-10 .inner-wrap .crc-src {
+    width: 89%;
+    float: left;
+}
+.form-style-10 .inner-wrap .crc-dst {
+    width: 11%;
+    float: right;
+}
+
 .form-style-10 .section{
     font: normal 20px 'Bitter', serif;
     color: #00A7D6;
