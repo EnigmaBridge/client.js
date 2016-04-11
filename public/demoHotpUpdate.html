@@ -155,24 +155,24 @@
         <div class="section"><span>4</span>Response</div>
         <div class="inner-wrap">
             <label>Status code
-                <input type="text" name="hotpStatus" id="hotpStatus" placeholder="Update status code"/>
+                <input type="text" name="hotpStatus" id="hotpStatus" placeholder="Update status code" readonly="readonly"/>
                 <span>Update result, 9000 means success</span>
             </label>
 
             <label>Updated user context
-                <input type="text" name="newUserCtx" id="newUserCtx" placeholder="binary blob"/>
+                <input type="text" name="newUserCtx" id="newUserCtx" placeholder="binary blob" readonly="readonly"/>
                 <span>User context updated by the service, used for further authentication requests.
                 <a onclick="updateCtx()">Update context in the request</a>
                 </span>
             </label>
 
             <label>HOTP secret
-                <input type="text" name="hotpSecret" id="hotpSecret" placeholder="HOTP secret key"/>
+                <input type="text" name="hotpSecret" id="hotpSecret" placeholder="HOTP secret key" readonly="readonly"/>
                 <span>HOTP secret key for the user, used for HOTP token initialization</span>
             </label>
 
             <label>QR link
-                <input type="text" name="qrLink" id="qrLink" placeholder="QR code content"/>
+                <input type="text" name="qrLink" id="qrLink" placeholder="QR code content" readonly="readonly"/>
                 <span>QR code content used to initialize authenticator</span>
             </label>
 

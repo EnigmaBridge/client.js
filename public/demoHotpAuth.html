@@ -159,12 +159,12 @@
         <div class="section"><span>4</span>Response</div>
         <div class="inner-wrap">
             <label>Status code
-                <input type="text" name="hotpStatus" id="hotpStatus" placeholder="Authentication status code"/>
+                <input type="text" name="hotpStatus" id="hotpStatus" placeholder="Authentication status code" readonly="readonly"/>
                 <span>Authentication result, 9000 means success</span>
             </label>
 
             <label>Updated user context
-                <input type="text" name="newUserCtx" id="newUserCtx" placeholder="binary blob"/>
+                <input type="text" name="newUserCtx" id="newUserCtx" placeholder="binary blob" readonly="readonly"/>
                 <span>User context updated by the service, used for further authentication requests.
                 <a onclick="updateCtx()">Update context in the request</a><br/>
                 <a href="#" id="redirHref" target="_blank">Update auth context (e.g., password reset)</a>
