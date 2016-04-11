@@ -378,6 +378,38 @@ eb.misc = {
     padHexToSize: function(x, size){
         x = x.trim().replace(/[\s]+/g, '').replace(/^0x/, '');
         return (x.length<size) ? (('0'.repeat(size-x.length))+x) : x
+    },
+
+    /**
+     * Generates checksum value from the input.
+     * @param x hexcoded string or bitArray. If you want to checksum arbitrary string, hash it first.
+     * @param size
+     */
+    genChecksumValue: function(x, size){
+        var inputBits = eb.misc.inputToBits(x);
+
+        // As we are reducing information from x to base32*size bits, we are performing
+        // two hash rounds to make sure the dependency is non-trivial.
+        var toHash = sjcl.codec.hex.fromBits(inputBits) + ',' + size + ',' + sjcl.bitArray.bitLength(inputBits);
+        var inputHashBits = sjcl.hash.sha256.hash(toHash);
+        var inputHashBits2 = sjcl.hash.sha256.hash(sjcl.codec.hex.fromBits(inputHashBits) + toHash);
+        var hashOut = [], i;
+        for(i=0; i<256/32; i++){
+            hashOut[i] = inputHashBits[i] ^ inputHashBits2[i];
+        }
+
+        // Base 32, size first characters
+        var base32string = sjcl.codec.base32.fromBits(hashOut);
+        return base32string.substring(0, size);
+    },
+    
+    /**
+     * Generates checksum value from the input.
+     * @param x an arbitraty string
+     * @param size
+     */
+    genChecksumValueFromString: function(x, size){
+        return eb.misc.genChecksumValue(sjcl.hash.sha256.hash(x), size);
     }
 };
 
