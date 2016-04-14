@@ -39,6 +39,17 @@ function successBg(x, success){
     }
 }
 
+/**
+ * Sets message to the status field together by setting its success class / background color.
+ * @param x
+ * @param msg
+ * @param success
+ */
+function statusFieldSet(x, msg, success){
+    x.val(msg);
+    successBg(x, success);
+}
+
 function getURLParameter(name) {
     return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null;
 }

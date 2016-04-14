@@ -132,9 +132,7 @@
 
     function connectionError(data){
         $('#response').val("");
-
-        statusElement.val("Connection error");
-        successBg(statusElement, false);
+        statusFieldSet(statusElement, "Connection error", false);
     }
 
     function finished(response){
@@ -146,9 +144,7 @@
             status += ' - Failed, unknown error';
         }
 
-        statusElement.val(status);
-        successBg(statusElement, responseStatus == eb.comm.status.SW_STAT_OK);
-
+        statusFieldSet(statusElement, status, responseStatus == eb.comm.status.SW_STAT_OK);
         if (response.keys){
             $('#response').val(response.toString());
         }
@@ -193,8 +189,7 @@
                 JSON.stringify(request.getSocketRequest())));
 
         // Do the call.
-        statusElement.val('...');
-        successBg(statusElement);
+        statusFieldSet(statusElement, '...');
         body.addClass("loading");
         request.doRequest();
     }
