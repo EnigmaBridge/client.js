@@ -360,6 +360,29 @@ eb.misc = {
     },
 
     /**
+     * Converts argument to the integer. If string is passed, it is considered as hex-coded integer.
+     * @param x
+     */
+    inputToHexNum: function(x){
+        var tmp,ln;
+        if (typeof(x) === 'number'){
+            return x;
+
+        } else if (typeof(x) === 'string') {
+            x = x.trim().replace(/^0x/, '');
+            if (!(x.match(/^[0-9A-Fa-f]+$/))){
+                throw new eb.exception.invalid("Invalid hex coded number");
+            }
+
+            return parseInt(x, 16);
+
+        } else {
+            throw new eb.exception.invalid("Invalid argument - not a number or string");
+
+        }
+    },
+
+    /**
      * Left zero padding to the even number of hexcoded digits.
      * @param x
      * @returns {*}
@@ -1202,7 +1225,7 @@ eb.comm.processDataRequestBodyBuilder.prototype = {
         // Input data flag
         var baBuff = h.toBits("1f");
         // User Object ID
-        baBuff = ba.concat(baBuff, h.toBits(sprintf("%08x", this.userObjectId)));
+        baBuff = ba.concat(baBuff, h.toBits(sprintf("%08x", eb.misc.inputToHexNum(this.userObjectId))));
         // Freshness nonce
         baBuff = ba.concat(baBuff, h.toBits(this.nonce));
         // User data
@@ -1297,7 +1320,7 @@ eb.comm.response.prototype = {
         return sprintf("Response{statusCode=0x%4X, statusDetail=[%s], userObjectId: 0x%08X, function: [%s], result: [%s]}",
             this.statusCode,
             this.statusDetail,
-            this.userObjectID,
+            eb.misc.inputToHexNum(this.userObjectID),
             this.function,
             JSON.stringify(this.result)
         );
@@ -1366,7 +1389,7 @@ eb.comm.processDataResponse.inheritsFrom(eb.comm.response, {
             "nonce: [%s], protectedData: [%s], plainData: [%s], mac: [%s], computedMac: [%s], macOK: %d",
             this.statusCode,
             this.statusDetail,
-            this.userObjectID,
+            eb.misc.inputToHexNum(this.userObjectID),
             this.function,
             sjcl.codec.hex.fromBits(this.nonce),
             sjcl.codec.hex.fromBits(this.protectedData),
@@ -1389,7 +1412,7 @@ eb.comm.pubKey.prototype = {
     key: undefined,
 
     toString: function(){
-        return sprintf("pubKey{id=0x%x, type=[%s], certificate:[%s], key:[%s]",
+        return sprintf("pubKey{id=0x%04X, type=[%s], certificate:[%s], key:[%s]",
             this.id,
             this.type,
             this.certificate ? sjcl.codec.hex.fromBits(this.certificate) : "null",
@@ -2125,12 +2148,12 @@ eb.comm.apiRequest.inheritsFrom(eb.comm.connector, {
      * Result is returned and set to the property.
      *
      * @param apiKey
-     * @param apiLow4b
+     * @param apiLow4b  integer or hex-coded string.
      */
     buildApiBlock: function(apiKey, apiLow4b){
         apiKey = apiKey || this.apiKey;
         apiLow4b = apiLow4b || this.apiKeyLow4Bytes;
-        this._apiKeyReq = sprintf("%s%010x", apiKey, apiLow4b);
+        this._apiKeyReq = sprintf("%s%010x", apiKey, eb.misc.inputToHexNum(apiLow4b));
         return this._apiKeyReq;
     },
 

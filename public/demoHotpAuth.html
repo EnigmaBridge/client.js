@@ -314,9 +314,7 @@
     }
 
     function connectionError(data){
-        var statusElem = $('#hotpStatus');
-        statusElem.val("Connection error");
-        successBg(statusElem, false);
+        statusFieldSet($('#hotpStatus'), "Connection error", false);
     }
 
     function finished(response){
@@ -349,9 +347,7 @@
             status += ' - Failed, unknown error';
         }
 
-        statusElem.val(status);
-        successBg(statusElem, response.hotpStatus == eb.comm.status.SW_STAT_OK);
-
+        statusFieldSet(statusElem, status, response.hotpStatus == eb.comm.status.SW_STAT_OK);
         if (response.hotpUserCtx){
             $('#newUserCtx').val(sjcl.codec.hex.fromBits(response.hotpUserCtx));
         }
@@ -437,8 +433,7 @@
                 JSON.stringify(request.getSocketRequest())));
 
         // Do the call.
-        $('#hotpStatus').val('...');
-        successBg($('#hotpStatus'));
+        statusFieldSet($('#hotpStatus'), '...');
         body.addClass("loading");
 
         request.doRequest();

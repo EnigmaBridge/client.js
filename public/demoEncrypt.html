@@ -293,9 +293,7 @@
 
     function connectionError(data){
         $('#response').val("");
-
-        statusElement.val("Connection error");
-        successBg(statusElement, false);
+        statusFieldSet(statusElement, "Connection error", false);
     }
 
     function finished(response){
@@ -314,9 +312,7 @@
             status += ' - Failed, unknown error';
         }
 
-        statusElement.val(status);
-        successBg(statusElement, responseStatus == eb.comm.status.SW_STAT_OK);
-
+        statusFieldSet(statusElement, status, responseStatus == eb.comm.status.SW_STAT_OK);
         if (response.protectedData){
             $('#response').val(sjcl.codec.hex.fromBits(response.protectedData));
         }
