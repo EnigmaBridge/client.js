@@ -362,8 +362,9 @@ eb.misc = {
     /**
      * Converts argument to the integer. If string is passed, it is considered as hex-coded integer.
      * @param x
+     * @param noThrow
      */
-    inputToHexNum: function(x){
+    inputToHexNum: function(x, noThrow){
         var tmp,ln;
         if (typeof(x) === 'number'){
             return x;
@@ -376,8 +377,11 @@ eb.misc = {
 
             return parseInt(x, 16);
 
-        } else {
+        } else if (noThrow === undefined || !noThrow) {
             throw new eb.exception.invalid("Invalid argument - not a number or string");
+
+        } else {
+            return x;
 
         }
     },
@@ -1320,7 +1324,7 @@ eb.comm.response.prototype = {
         return sprintf("Response{statusCode=0x%4X, statusDetail=[%s], userObjectId: 0x%08X, function: [%s], result: [%s]}",
             this.statusCode,
             this.statusDetail,
-            eb.misc.inputToHexNum(this.userObjectID),
+            eb.misc.inputToHexNum(this.userObjectID, true),
             this.function,
             JSON.stringify(this.result)
         );
@@ -1389,7 +1393,7 @@ eb.comm.processDataResponse.inheritsFrom(eb.comm.response, {
             "nonce: [%s], protectedData: [%s], plainData: [%s], mac: [%s], computedMac: [%s], macOK: %d",
             this.statusCode,
             this.statusDetail,
-            eb.misc.inputToHexNum(this.userObjectID),
+            eb.misc.inputToHexNum(this.userObjectID, true),
             this.function,
             sjcl.codec.hex.fromBits(this.nonce),
             sjcl.codec.hex.fromBits(this.protectedData),
