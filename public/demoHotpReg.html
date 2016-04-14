@@ -214,9 +214,7 @@
         $('#userCtx').val("");
         $('#redirBlock').hide('slow');
 
-        var statusElem = $('#hotpStatus');
-        statusElem.val("Connection error");
-        successBg(statusElem, false);
+        statusFieldSet($('#hotpStatus'), "Connection error", false);
     }
 
     function finished(response){
@@ -237,9 +235,7 @@
             status += ' - Failed, unknown error';
         }
 
-        statusElem.val(status);
-        successBg(statusElem, response.hotpStatus == eb.comm.status.SW_STAT_OK);
-
+        statusFieldSet(statusElem, status, response.hotpStatus == eb.comm.status.SW_STAT_OK);
         if (response.hotpUserId){
             $('#userId').val(sjcl.codec.hex.fromBits(eb.comm.hotp.userIdToBits(response.hotpUserId)));
         }
@@ -348,7 +344,11 @@
 
         }).fail(function(failType, data){
             log("fail! type=" + failType + ", response="+(data && data.response ? data.response.toString() : 'undefined')+"\n data=" + JSON.stringify(data));
-            if (failType == eb.comm.status.PDATA_FAIL_CONNECTION){
+            if (failType == eb.comm.status.PDATA_FAIL_RESPONSE_FAILED){
+                log("Fail msg: " + data.response.toString());
+                finished(data.response);
+
+            } else if (failType == eb.comm.status.PDATA_FAIL_CONNECTION){
                 log("Connection error");
                 connectionError(data);
             }
@@ -366,8 +366,7 @@
                 JSON.stringify(request.getSocketRequest())));
 
         // Do the call.
-        $('#hotpStatus').val('...');
-        successBg($('#hotpStatus'));
+        statusFieldSet($('#hotpStatus'), '...');
         body.addClass("loading");
 
         request.doRequest();
