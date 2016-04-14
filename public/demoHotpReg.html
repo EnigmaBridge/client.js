@@ -348,7 +348,11 @@
 
         }).fail(function(failType, data){
             log("fail! type=" + failType + ", response="+(data && data.response ? data.response.toString() : 'undefined')+"\n data=" + JSON.stringify(data));
-            if (failType == eb.comm.status.PDATA_FAIL_CONNECTION){
+            if (failType == eb.comm.status.PDATA_FAIL_RESPONSE_FAILED){
+                log("Fail msg: " + data.response.toString());
+                finished(data.response);
+
+            } else if (failType == eb.comm.status.PDATA_FAIL_CONNECTION){
                 log("Connection error");
                 connectionError(data);
             }
