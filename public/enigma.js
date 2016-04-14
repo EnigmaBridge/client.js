@@ -1412,7 +1412,7 @@ eb.comm.pubKey.prototype = {
     key: undefined,
 
     toString: function(){
-        return sprintf("pubKey{id=0x%x, type=[%s], certificate:[%s], key:[%s]",
+        return sprintf("pubKey{id=0x%04X, type=[%s], certificate:[%s], key:[%s]",
             this.id,
             this.type,
             this.certificate ? sjcl.codec.hex.fromBits(this.certificate) : "null",
