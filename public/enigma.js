@@ -43,97 +43,191 @@ Function.prototype.inheritsFrom = function( parentClassOrObject, newPrototype ){
 /**
  * SHA1 implementation, not present in default SJCL.
  * We need it for HOTP.
- * @param a
  */
-sjcl.hash.sha1 = function(a) {
-    if (a) {
-        this._h = a._h.slice(0);
-        this._buffer = a._buffer.slice(0);
-        this._length = a._length
+/** Javascript SHA-1 implementation.
+ *
+ * Based on the implementation in RFC 3174, method 1, and on the SJCL
+ * SHA-256 implementation.
+ *
+ * @author Quinn Slack
+ */
+/**
+ * Context for a SHA-1 operation in progress.
+ * @constructor
+ * @class Secure Hash Algorithm, 160 bits.
+ */
+sjcl.hash.sha1 = function (hash) {
+    if (hash) {
+        this._h = hash._h.slice(0);
+        this._buffer = hash._buffer.slice(0);
+        this._length = hash._length;
     } else {
-        this.reset()
+        this.reset();
     }
 };
-sjcl.hash.sha1.hash = function(a) {
-    return (new sjcl.hash.sha1()).update(a).finalize()
+
+/**
+ * Hash a string or an array of words.
+ * @static
+ * @param {bitArray|String} data the data to hash.
+ * @return {bitArray} The hash value, an array of 5 big-endian words.
+ */
+sjcl.hash.sha1.hash = function (data) {
+    return (new sjcl.hash.sha1()).update(data).finalize();
 };
 sjcl.hash.sha1.prototype = {
+    /**
+     * The hash's block size, in bits.
+     * @constant
+     */
     blockSize: 512,
-    reset: function() {
+
+    /**
+     * Reset the hash state.
+     * @return this
+     */
+    reset:function () {
         this._h = this._init.slice(0);
         this._buffer = [];
         this._length = 0;
-        return this
+        return this;
     },
-    update: function(f) {
-        if (typeof f === "string") {
-            f = sjcl.codec.utf8String.toBits(f)
+
+    /**
+     * Input several words to the hash.
+     * @param {bitArray|String} data the data to hash.
+     * @return this
+     */
+    update: function (data) {
+        if (typeof data === "string") {
+            data = sjcl.codec.utf8String.toBits(data);
         }
-        var e, a = this._buffer = sjcl.bitArray.concat(this._buffer, f), d = this._length, c = this._length = d + sjcl.bitArray.bitLength(f);
-        for (e = this.blockSize + d & -this.blockSize; e <= c; e += this.blockSize) {
-            this._block(a.splice(0, 16))
-        }
-        return this
-    },
-    finalize: function() {
-        var c, a = this._buffer, d = this._h;
-        a = sjcl.bitArray.concat(a, [sjcl.bitArray.partial(1, 1)]);
-        for (c = a.length + 2; c & 15; c++) {
-            a.push(0)
-        }
-        a.push(Math.floor(this._length / 4294967296));
-        a.push(this._length | 0);
-        while (a.length) {
-            this._block(a.splice(0, 16))
-        }
-        this.reset();
-        return d
-    },
-    _init: [1732584193, 4023233417, 2562383102, 271733878, 3285377520],
-    _key: [1518500249, 1859775393, 2400959708, 3395469782],
-    _f: function(e, a, g, f) {
-        if (e <= 19) {
-            return (a & g) | (~a & f)
+        var i, b = this._buffer = sjcl.bitArray.concat(this._buffer, data),
+            ol = this._length,
+            nl = this._length = ol + sjcl.bitArray.bitLength(data);
+        if (typeof Uint32Array !== 'undefined') {
+            var c = new Uint32Array(b);
+            var j = 0;
+            for (i = this.blockSize+ol & -this.blockSize; i <= nl;
+                 i+= this.blockSize) {
+                this._block(c.subarray(16 * j, 16 * (j+1)));
+                j += 1;
+            }
+            b.splice(0, 16 * j);
         } else {
-            if (e <= 39) {
-                return a ^ g ^ f
-            } else {
-                if (e <= 59) {
-                    return (a & g) | (a & f) | (g & f)
-                } else {
-                    if (e <= 79) {
-                        return a ^ g ^ f
-                    }
-                }
+            for (i = this.blockSize+ol & -this.blockSize; i <= nl;
+                 i+= this.blockSize) {
+                this._block(b.splice(0,16));
             }
         }
+        return this;
     },
-    _S: function(b, a) {
-        return (a << b) | (a >>> 32 - b)
-    },
-    _block: function(n) {
-        var r, g, p, o, m, l, j, q = n.slice(0), i = this._h, f = this._key;
-        p = i[0];
-        o = i[1];
-        m = i[2];
-        l = i[3];
-        j = i[4];
-        for (r = 0; r <= 79; r++) {
-            if (r >= 16) {
-                q[r] = this._S(1, q[r - 3] ^ q[r - 8] ^ q[r - 14] ^ q[r - 16])
-            }
-            g = (this._S(5, p) + this._f(r, o, m, l) + j + q[r] + this._key[Math.floor(r / 20)]) | 0;
-            j = l;
-            l = m;
-            m = this._S(30, o);
-            o = p;
-            p = g
+
+    /**
+     * Complete hashing and output the hash value.
+     * @return {bitArray} The hash value, an array of 5 big-endian words. TODO
+     */
+    finalize:function () {
+        var i, b = this._buffer, h = this._h;
+
+        // Round out and push the buffer
+        b = sjcl.bitArray.concat(b, [sjcl.bitArray.partial(1,1)]);
+        // Round out the buffer to a multiple of 16 words, less the 2 length words.
+        for (i = b.length + 2; i & 15; i++) {
+            b.push(0);
         }
-        i[0] = (i[0] + p) | 0;
-        i[1] = (i[1] + o) | 0;
-        i[2] = (i[2] + m) | 0;
-        i[3] = (i[3] + l) | 0;
-        i[4] = (i[4] + j) | 0
+
+        // append the length
+        b.push(Math.floor(this._length / 0x100000000));
+        b.push(this._length | 0);
+
+        while (b.length) {
+            this._block(b.splice(0,16));
+        }
+
+        this.reset();
+        return h;
+    },
+
+    /**
+     * The SHA-1 initialization vector.
+     * @private
+     */
+    _init:[0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0],
+
+    /**
+     * The SHA-1 hash key.
+     * @private
+     */
+    _key:[0x5A827999, 0x6ED9EBA1, 0x8F1BBCDC, 0xCA62C1D6],
+
+    /**
+     * The SHA-1 logical functions f(0), f(1), ..., f(79).
+     * @private
+     */
+    _f:function(t, b, c, d) {
+        if (t <= 19) {
+            return (b & c) | (~b & d);
+        } else if (t <= 39) {
+            return b ^ c ^ d;
+        } else if (t <= 59) {
+            return (b & c) | (b & d) | (c & d);
+        } else if (t <= 79) {
+            return b ^ c ^ d;
+        }
+    },
+
+    /**
+     * Circular left-shift operator.
+     * @private
+     */
+    _S:function(n, x) {
+        return (x << n) | (x >>> 32-n);
+    },
+
+    /**
+     * Perform one cycle of SHA-1.
+     * @param {Uint32Array|bitArray} words one block of words.
+     * @private
+     */
+    _block:function (words) {
+        var t, tmp, a, b, c, d, e,
+            h = this._h;
+        var w;
+        if (typeof Uint32Array !== 'undefined') {
+            // When words is passed to _block, it has 16 elements. SHA1 _block
+            // function extends words with new elements (at the end there are 80 elements).
+            // The problem is that if we use Uint32Array instead of Array,
+            // the length of Uint32Array cannot be changed. Thus, we replace words with a
+            // normal Array here.
+            w = Array(80); // do not use Uint32Array here as the instantiation is slower
+            for (var j=0; j<16; j++){
+                w[j] = words[j];
+            }
+        } else {
+            w = words;
+        }
+
+        a = h[0]; b = h[1]; c = h[2]; d = h[3]; e = h[4];
+
+        for (t=0; t<=79; t++) {
+            if (t >= 16) {
+                w[t] = this._S(1, w[t-3] ^ w[t-8] ^ w[t-14] ^ w[t-16]);
+            }
+            tmp = (this._S(5, a) + this._f(t, b, c, d) + e + w[t] +
+                this._key[Math.floor(t/20)]) | 0;
+            e = d;
+            d = c;
+            c = this._S(30, b);
+            b = a;
+            a = tmp;
+        }
+
+        h[0] = (h[0]+a) |0;
+        h[1] = (h[1]+b) |0;
+        h[2] = (h[2]+c) |0;
+        h[3] = (h[3]+d) |0;
+        h[4] = (h[4]+e) |0;
     }
 };
 
