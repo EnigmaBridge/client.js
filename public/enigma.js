@@ -348,6 +348,11 @@ var eb = {
  */
 eb.misc = {
     name: "misc",
+
+    MAX_SAFE_INTEGER: Math.pow(2, 53) - 1,
+    MIN_SAFE_INTEGER: -(Math.pow(2, 53) - 1),
+    EPSILON: 2.2204460492503130808472633361816E-16,
+
     genNonce: function(length, alphabet){
         var nonce = "";
         var alphabetLen = alphabet.length;
@@ -367,6 +372,9 @@ eb.misc = {
     },
     xor: function(x,y){
         return [x[0]^y[0],x[1]^y[1],x[2]^y[2],x[3]^y[3]];
+    },
+    xor8: function(x,y){
+        return [x[0]^y[0],x[1]^y[1],x[2]^y[2],x[3]^y[3],x[4]^y[4],x[5]^y[5],x[6]^y[6],x[7]^y[7]];
     },
     absorb: function(dst, src){
         if (src === undefined){
@@ -481,6 +489,58 @@ eb.misc = {
     },
 
     /**
+     * Function generates a zero bit vector of given size.
+     * @param bitLength
+     */
+    getZeroBits: function(bitLength){
+        if (bitLength <= 0) {
+            return [];
+        }
+
+        var bs = [0, 0, 0, 0,   0, 0, 0, 0], i;
+        for(i=256; i<bitLength; i+=32){
+            bs.push(0);
+        }
+
+        return sjcl.bitArray.bitSlice(bs, 0, bitLength);
+    },
+
+    /**
+     * Converts given number to the bitArray representation.
+     *
+     * @param num
+     * @param bitSize
+     */
+    numberToBits: function(num, bitSize){
+        if (bitSize > 32){
+            throw new eb.exception.invalid("num can be maximally 32bit wide");
+        }
+        if (bitSize == 32){
+            return [num];
+        }
+        return sjcl.bitArray.bitSlice([num], 32-bitSize, 32);
+    },
+
+    /**
+     * Serializes 64bit number to a bitArray.
+     * @param {Number} num
+     * @returns {bitArray|Array}
+     */
+    serialize64bit: function(num){
+        return [Math.floor(num/0x100000000), (num|0)];
+    },
+
+    /**
+     * Deserializes 64bit number from bitArray
+     * @param {bitArray} arr
+     * @param {number} [offset] Default 0
+     */
+    deserialize64bit: function(arr, offset){
+        offset = offset || 0;
+        return (arr[offset]*0x100000000 + (arr[offset+1]) + (arr[offset+1] < 0 ? 0x100000000 : 0));
+    },
+
+    /**
      * Left zero padding to the even number of hexcoded digits.
      * @param x
      * @returns {*}
@@ -499,6 +559,34 @@ eb.misc = {
     padHexToSize: function(x, size){
         x = x.trim().replace(/[\s]+/g, '').replace(/^0x/, '');
         return (x.length<size) ? (('0'.repeat(size-x.length))+x) : x
+    },
+
+    /**
+     * Pads number x to full block size.
+     * Useful when computing total size after padding added.
+     * If x is multiple of bs, another block is added (pkcs7 works in this way).
+     *
+     * @param x number of units
+     * @param bs block size - same units as x
+     */
+    padToBlockSize: function(x, bs){
+        return x + (bs - (x % bs));
+    },
+
+    /**
+     * Returns the byte length of an utf8 string.
+     * @param str
+     * @returns {*}
+     */
+    strByteLength: function(str) {
+        var s = str.length;
+        for (var i=str.length-1; i>=0; i--) {
+            var code = str.charCodeAt(i);
+            if (code > 0x7f && code <= 0x7ff) s++;
+            else if (code > 0x7ff && code <= 0xffff) s+=2;
+            if (code >= 0xDC00 && code <= 0xDFFF) i--; //trail surrogate
+        }
+        return s;
     },
 
     /**
@@ -523,7 +611,7 @@ eb.misc = {
         var base32string = sjcl.codec.base32.fromBits(hashOut);
         return base32string.substring(0, size);
     },
-    
+
     /**
      * Generates checksum value from the input.
      * @param x an arbitraty string
@@ -531,6 +619,21 @@ eb.misc = {
      */
     genChecksumValueFromString: function(x, size){
         return eb.misc.genChecksumValue(sjcl.hash.sha256.hash(x), size);
+    },
+
+    /**
+     * Asserts the condition.
+     * @param condition
+     * @param message
+     */
+    assert: function(condition, message) {
+        if (!condition) {
+            message = message || "Assertion failed";
+            if (typeof Error !== "undefined") {
+                throw new Error(message);
+            }
+            throw message; // Fallback
+        }
     }
 };
 
@@ -888,11 +991,11 @@ eb.padding.pkcs15 = {
                 }while(curByte == 0);
             }
 
-           tmp = tmp << 8 | curByte;
-           if ((i&3) === 3) {
-                 ps.push(tmp);
-                 tmp = 0;
-           }
+            tmp = tmp << 8 | curByte;
+            if ((i&3) === 3) {
+                ps.push(tmp);
+                tmp = 0;
+            }
         }
         if (i&3) {
             ps.push(sjcl.bitArray.partial(8*(i&3), tmp));
@@ -1027,7 +1130,7 @@ sjcl.misc.hmac_cbc.prototype.encrypt = sjcl.misc.hmac_cbc.prototype.mac = functi
 };
 
 /**
- * CBC encryption mode.
+ * CBC encryption mode implementation.
  * @type {{name: string, encrypt: sjcl.mode.cbc.encrypt, decrypt: sjcl.mode.cbc.decrypt}}
  */
 sjcl.mode.cbc = {
@@ -1102,12 +1205,15 @@ sjcl.mode.cbc = {
 eb.comm = {
     name: "comm",
 
+    REQ_METHOD_GET: "GET",
+    REQ_METHOD_POST: "POST",
+
     /**
      * General status constants.
      */
     status: {
         ERROR_CLASS_SECURITY:           0x2000,
-        
+
         ERROR_CLASS_WRONGDATA:          0x8000,
         SW_INVALID_TLV_FORMAT:          0x8000 | 0x04c,
         SW_WRONG_PADDING:               0x8000 | 0x03d,
@@ -1306,7 +1412,7 @@ eb.comm.processDataRequestBodyBuilder.prototype = {
     /**
      * Builds EB request.
      *
-     * @param plainData - bitArray of the plaintext data (will be MAC protected).
+     * @param plainData - bitArray of the plaintext data.
      * @param requestData - bitArray with userdata to perform operation on (will be encrypted, MAC protected)
      * @returns request body string.
      */
@@ -1340,7 +1446,7 @@ eb.comm.processDataRequestBodyBuilder.prototype = {
         var hmac = new sjcl.misc.hmac_cbc(aesMac, 16, eb.padding.empty);
 
         // IV is null, nonce in the first block is kind of IV.
-        var IV = h.toBits('00'.repeat(16));
+        var IV = [0, 0, 0, 0];
         var encryptedData = sjcl.mode.cbc.encrypt(aes, baBuff, IV, [], true);
         this._log('Encrypted ProcessData input ENC(PDIN): ' + h.fromBits(encryptedData) + ", len=" + ba.bitLength(encryptedData));
 
@@ -1752,7 +1858,7 @@ eb.comm.processDataResponseParser.inheritsFrom(eb.comm.responseParser, {
         }
 
         // IV is null, nonce in the first block is kind of IV.
-        var IV = h.toBits('00'.repeat(16));
+        var IV = [0, 0, 0, 0];
         var decryptedData = sjcl.mode.cbc.decrypt(aes, dataToDecrypt, IV, [], false);
         this._log("decryptedData: " + h.fromBits(decryptedData) + ", len=" + ba.bitLength(decryptedData));
 
@@ -1791,7 +1897,7 @@ eb.comm.connector.prototype = {
      * Method to do REST request with. GET or POST are allowed.
      * @input
      */
-    requestMethod: "POST",
+    requestMethod: eb.comm.REQ_METHOD_POST,
 
     /**
      * Scheme used to contact remote API.
@@ -1811,7 +1917,7 @@ eb.comm.connector.prototype = {
      * Endpoint where EB API listens
      * @input
      */
-    remoteEndpoint: "dragonfly.smarthsm.net",
+    remoteEndpoint: "site1.enigmabridge.com",
 
     /**
      * Port of the remote endpoint
@@ -1967,7 +2073,7 @@ eb.comm.connector.prototype = {
             type: this.requestMethod,
             dataType: 'json',
             timeout: this.requestTimeout,
-            data: this.requestMethod == "POST" ? JSON.stringify(apiData) : null
+            data: this.requestMethod == eb.comm.REQ_METHOD_POST ? JSON.stringify(apiData) : null
         };
 
         // Extend ajax settings with user provided settings.
@@ -2042,6 +2148,7 @@ eb.comm.connector.prototype = {
                         'jqXHR':jqXHR,
                         'textStatus':textStatus,
                         'response':this.response,
+                        'failType':eb.comm.status.PDATA_FAIL_RESPONSE_FAILED,
                         'requestObj':this
                     });
                 }
@@ -2053,6 +2160,7 @@ eb.comm.connector.prototype = {
                 this._failCallback(eb.comm.status.PDATA_FAIL_RESPONSE_PARSING, {
                     'jqXHR':jqXHR,
                     'textStatus':textStatus,
+                    'failType':eb.comm.status.PDATA_FAIL_RESPONSE_PARSING,
                     'requestObj':this,
                     'parseException':e
                 });
@@ -2076,6 +2184,7 @@ eb.comm.connector.prototype = {
                 'jqXHR':jqXHR,
                 'textStatus':textStatus,
                 'errorThrown':errorThrown,
+                'failType':eb.comm.status.PDATA_FAIL_CONNECTION,
                 'requestObj': this
             });
         }
@@ -2319,7 +2428,7 @@ eb.comm.apiRequest.inheritsFrom(eb.comm.connector, {
      * @returns {*}
      */
     getApiUrl: function(){
-        if (this.requestMethod == "POST" || (this.requestMethod == "GET" && !this.reqBody)){
+        if (this.requestMethod == eb.comm.REQ_METHOD_POST || (this.requestMethod == eb.comm.REQ_METHOD_GET && !this.reqBody)){
             return sprintf("%s://%s:%d/%s/%s/%s/%s",
                 this.requestScheme,
                 this.remoteEndpoint,
@@ -2329,7 +2438,7 @@ eb.comm.apiRequest.inheritsFrom(eb.comm.connector, {
                 this.callFunction,
                 this.getNonce());
 
-        } else if (this.requestMethod == "GET"){
+        } else if (this.requestMethod == eb.comm.REQ_METHOD_GET){
             return sprintf("%s://%s:%d/%s/%s/%s/%s%s",
                 this.requestScheme,
                 this.remoteEndpoint,
@@ -2353,7 +2462,7 @@ eb.comm.apiRequest.inheritsFrom(eb.comm.connector, {
      * @returns {*}
      */
     getApiRequestData: function(){
-        if (this.requestMethod == "POST") {
+        if (this.requestMethod == eb.comm.REQ_METHOD_POST) {
             return this.reqBody;
         } else {
             return {};
@@ -2452,16 +2561,19 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
         if ("userObjectId" in configObject){
             toConfig = $.extend(true, toConfig, {apiKeyLow4Bytes : configObject.userObjectId});
         }
+        if ("encKey" in configObject){
+            toConfig = $.extend(true, toConfig, {aesKey : configObject.encKey});
+        }
 
         // Configure with parent.
         eb.comm.processData.superclass.configure.call(this, toConfig);
 
         // Configure this.
         var ak = eb.misc.absorbKey;
-        ak(this, configObject, "aesKey");
-        ak(this, configObject, "macKey");
-        ak(this, configObject, "userObjectId");
-        ak(this, configObject, "callRequestType");
+        ak(this, toConfig, "aesKey");
+        ak(this, toConfig, "macKey");
+        ak(this, toConfig, "userObjectId");
+        ak(this, toConfig, "callRequestType");
     },
 
     /**
@@ -2522,7 +2634,7 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
      * @returns {*}
      */
     getApiUrl: function(){
-        if (this.requestMethod == "POST"){
+        if (this.requestMethod == eb.comm.REQ_METHOD_POST){
             return sprintf("%s://%s:%d/%s/%s/%s/%s",
                 this.requestScheme,
                 this.remoteEndpoint,
@@ -2532,7 +2644,7 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
                 this.callFunction,
                 this.getNonce());
 
-        } else if (this.requestMethod == "GET"){
+        } else if (this.requestMethod == eb.comm.REQ_METHOD_GET){
             return sprintf("%s://%s:%d/%s/%s/%s/%s/%s",
                 this.requestScheme,
                 this.remoteEndpoint,
@@ -2556,7 +2668,7 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
      * @returns {*}
      */
     getApiRequestData: function(){
-        if (this.requestMethod == "POST") {
+        if (this.requestMethod == eb.comm.REQ_METHOD_POST) {
             return this.reqBody;
         } else {
             return {};
@@ -2775,7 +2887,7 @@ eb.comm.hotp = {
         tpl = eb.padding.pkcs7.pad(tpl);
 
         // IV is null, nonce in the first block is kind of IV.
-        var IV = sjcl.codec.hex.toBits('00'.repeat(16));
+        var IV = [0, 0, 0, 0];
         var encryptedData = sjcl.mode.cbc.encrypt(aes, tpl, IV, [], true);
         var hmacData = hmac.mac(encryptedData);
 
@@ -3483,7 +3595,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         // Check for the plainData length = 0 was here, but protected data does not contain plain data,
         // it was moved to a different field in the response message so we don't check it here,
         // while original code in processUserAuthResponse does.
-        
+
         // Check main tag value.
         var tag = ba.extract(data, offset, 8);
         offset += 8;
