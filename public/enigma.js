@@ -43,97 +43,191 @@ Function.prototype.inheritsFrom = function( parentClassOrObject, newPrototype ){
 /**
  * SHA1 implementation, not present in default SJCL.
  * We need it for HOTP.
- * @param a
  */
-sjcl.hash.sha1 = function(a) {
-    if (a) {
-        this._h = a._h.slice(0);
-        this._buffer = a._buffer.slice(0);
-        this._length = a._length
+/** Javascript SHA-1 implementation.
+ *
+ * Based on the implementation in RFC 3174, method 1, and on the SJCL
+ * SHA-256 implementation.
+ *
+ * @author Quinn Slack
+ */
+/**
+ * Context for a SHA-1 operation in progress.
+ * @constructor
+ * @class Secure Hash Algorithm, 160 bits.
+ */
+sjcl.hash.sha1 = function (hash) {
+    if (hash) {
+        this._h = hash._h.slice(0);
+        this._buffer = hash._buffer.slice(0);
+        this._length = hash._length;
     } else {
-        this.reset()
+        this.reset();
     }
 };
-sjcl.hash.sha1.hash = function(a) {
-    return (new sjcl.hash.sha1()).update(a).finalize()
+
+/**
+ * Hash a string or an array of words.
+ * @static
+ * @param {bitArray|String} data the data to hash.
+ * @return {bitArray} The hash value, an array of 5 big-endian words.
+ */
+sjcl.hash.sha1.hash = function (data) {
+    return (new sjcl.hash.sha1()).update(data).finalize();
 };
 sjcl.hash.sha1.prototype = {
+    /**
+     * The hash's block size, in bits.
+     * @constant
+     */
     blockSize: 512,
-    reset: function() {
+
+    /**
+     * Reset the hash state.
+     * @return this
+     */
+    reset:function () {
         this._h = this._init.slice(0);
         this._buffer = [];
         this._length = 0;
-        return this
+        return this;
     },
-    update: function(f) {
-        if (typeof f === "string") {
-            f = sjcl.codec.utf8String.toBits(f)
+
+    /**
+     * Input several words to the hash.
+     * @param {bitArray|String} data the data to hash.
+     * @return this
+     */
+    update: function (data) {
+        if (typeof data === "string") {
+            data = sjcl.codec.utf8String.toBits(data);
         }
-        var e, a = this._buffer = sjcl.bitArray.concat(this._buffer, f), d = this._length, c = this._length = d + sjcl.bitArray.bitLength(f);
-        for (e = this.blockSize + d & -this.blockSize; e <= c; e += this.blockSize) {
-            this._block(a.splice(0, 16))
-        }
-        return this
-    },
-    finalize: function() {
-        var c, a = this._buffer, d = this._h;
-        a = sjcl.bitArray.concat(a, [sjcl.bitArray.partial(1, 1)]);
-        for (c = a.length + 2; c & 15; c++) {
-            a.push(0)
-        }
-        a.push(Math.floor(this._length / 4294967296));
-        a.push(this._length | 0);
-        while (a.length) {
-            this._block(a.splice(0, 16))
-        }
-        this.reset();
-        return d
-    },
-    _init: [1732584193, 4023233417, 2562383102, 271733878, 3285377520],
-    _key: [1518500249, 1859775393, 2400959708, 3395469782],
-    _f: function(e, a, g, f) {
-        if (e <= 19) {
-            return (a & g) | (~a & f)
+        var i, b = this._buffer = sjcl.bitArray.concat(this._buffer, data),
+            ol = this._length,
+            nl = this._length = ol + sjcl.bitArray.bitLength(data);
+        if (typeof Uint32Array !== 'undefined') {
+            var c = new Uint32Array(b);
+            var j = 0;
+            for (i = this.blockSize+ol & -this.blockSize; i <= nl;
+                 i+= this.blockSize) {
+                this._block(c.subarray(16 * j, 16 * (j+1)));
+                j += 1;
+            }
+            b.splice(0, 16 * j);
         } else {
-            if (e <= 39) {
-                return a ^ g ^ f
-            } else {
-                if (e <= 59) {
-                    return (a & g) | (a & f) | (g & f)
-                } else {
-                    if (e <= 79) {
-                        return a ^ g ^ f
-                    }
-                }
+            for (i = this.blockSize+ol & -this.blockSize; i <= nl;
+                 i+= this.blockSize) {
+                this._block(b.splice(0,16));
             }
         }
+        return this;
     },
-    _S: function(b, a) {
-        return (a << b) | (a >>> 32 - b)
-    },
-    _block: function(n) {
-        var r, g, p, o, m, l, j, q = n.slice(0), i = this._h, f = this._key;
-        p = i[0];
-        o = i[1];
-        m = i[2];
-        l = i[3];
-        j = i[4];
-        for (r = 0; r <= 79; r++) {
-            if (r >= 16) {
-                q[r] = this._S(1, q[r - 3] ^ q[r - 8] ^ q[r - 14] ^ q[r - 16])
-            }
-            g = (this._S(5, p) + this._f(r, o, m, l) + j + q[r] + this._key[Math.floor(r / 20)]) | 0;
-            j = l;
-            l = m;
-            m = this._S(30, o);
-            o = p;
-            p = g
+
+    /**
+     * Complete hashing and output the hash value.
+     * @return {bitArray} The hash value, an array of 5 big-endian words. TODO
+     */
+    finalize:function () {
+        var i, b = this._buffer, h = this._h;
+
+        // Round out and push the buffer
+        b = sjcl.bitArray.concat(b, [sjcl.bitArray.partial(1,1)]);
+        // Round out the buffer to a multiple of 16 words, less the 2 length words.
+        for (i = b.length + 2; i & 15; i++) {
+            b.push(0);
         }
-        i[0] = (i[0] + p) | 0;
-        i[1] = (i[1] + o) | 0;
-        i[2] = (i[2] + m) | 0;
-        i[3] = (i[3] + l) | 0;
-        i[4] = (i[4] + j) | 0
+
+        // append the length
+        b.push(Math.floor(this._length / 0x100000000));
+        b.push(this._length | 0);
+
+        while (b.length) {
+            this._block(b.splice(0,16));
+        }
+
+        this.reset();
+        return h;
+    },
+
+    /**
+     * The SHA-1 initialization vector.
+     * @private
+     */
+    _init:[0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0],
+
+    /**
+     * The SHA-1 hash key.
+     * @private
+     */
+    _key:[0x5A827999, 0x6ED9EBA1, 0x8F1BBCDC, 0xCA62C1D6],
+
+    /**
+     * The SHA-1 logical functions f(0), f(1), ..., f(79).
+     * @private
+     */
+    _f:function(t, b, c, d) {
+        if (t <= 19) {
+            return (b & c) | (~b & d);
+        } else if (t <= 39) {
+            return b ^ c ^ d;
+        } else if (t <= 59) {
+            return (b & c) | (b & d) | (c & d);
+        } else if (t <= 79) {
+            return b ^ c ^ d;
+        }
+    },
+
+    /**
+     * Circular left-shift operator.
+     * @private
+     */
+    _S:function(n, x) {
+        return (x << n) | (x >>> 32-n);
+    },
+
+    /**
+     * Perform one cycle of SHA-1.
+     * @param {Uint32Array|bitArray} words one block of words.
+     * @private
+     */
+    _block:function (words) {
+        var t, tmp, a, b, c, d, e,
+            h = this._h;
+        var w;
+        if (typeof Uint32Array !== 'undefined') {
+            // When words is passed to _block, it has 16 elements. SHA1 _block
+            // function extends words with new elements (at the end there are 80 elements).
+            // The problem is that if we use Uint32Array instead of Array,
+            // the length of Uint32Array cannot be changed. Thus, we replace words with a
+            // normal Array here.
+            w = Array(80); // do not use Uint32Array here as the instantiation is slower
+            for (var j=0; j<16; j++){
+                w[j] = words[j];
+            }
+        } else {
+            w = words;
+        }
+
+        a = h[0]; b = h[1]; c = h[2]; d = h[3]; e = h[4];
+
+        for (t=0; t<=79; t++) {
+            if (t >= 16) {
+                w[t] = this._S(1, w[t-3] ^ w[t-8] ^ w[t-14] ^ w[t-16]);
+            }
+            tmp = (this._S(5, a) + this._f(t, b, c, d) + e + w[t] +
+                this._key[Math.floor(t/20)]) | 0;
+            e = d;
+            d = c;
+            c = this._S(30, b);
+            b = a;
+            a = tmp;
+        }
+
+        h[0] = (h[0]+a) |0;
+        h[1] = (h[1]+b) |0;
+        h[2] = (h[2]+c) |0;
+        h[3] = (h[3]+d) |0;
+        h[4] = (h[4]+e) |0;
     }
 };
 
@@ -254,6 +348,11 @@ var eb = {
  */
 eb.misc = {
     name: "misc",
+
+    MAX_SAFE_INTEGER: Math.pow(2, 53) - 1,
+    MIN_SAFE_INTEGER: -(Math.pow(2, 53) - 1),
+    EPSILON: 2.2204460492503130808472633361816E-16,
+
     genNonce: function(length, alphabet){
         var nonce = "";
         var alphabetLen = alphabet.length;
@@ -273,6 +372,9 @@ eb.misc = {
     },
     xor: function(x,y){
         return [x[0]^y[0],x[1]^y[1],x[2]^y[2],x[3]^y[3]];
+    },
+    xor8: function(x,y){
+        return [x[0]^y[0],x[1]^y[1],x[2]^y[2],x[3]^y[3],x[4]^y[4],x[5]^y[5],x[6]^y[6],x[7]^y[7]];
     },
     absorb: function(dst, src){
         if (src === undefined){
@@ -387,6 +489,58 @@ eb.misc = {
     },
 
     /**
+     * Function generates a zero bit vector of given size.
+     * @param bitLength
+     */
+    getZeroBits: function(bitLength){
+        if (bitLength <= 0) {
+            return [];
+        }
+
+        var bs = [0, 0, 0, 0,   0, 0, 0, 0], i;
+        for(i=256; i<bitLength; i+=32){
+            bs.push(0);
+        }
+
+        return sjcl.bitArray.bitSlice(bs, 0, bitLength);
+    },
+
+    /**
+     * Converts given number to the bitArray representation.
+     *
+     * @param num
+     * @param bitSize
+     */
+    numberToBits: function(num, bitSize){
+        if (bitSize > 32){
+            throw new eb.exception.invalid("num can be maximally 32bit wide");
+        }
+        if (bitSize == 32){
+            return [num];
+        }
+        return sjcl.bitArray.bitSlice([num], 32-bitSize, 32);
+    },
+
+    /**
+     * Serializes 64bit number to a bitArray.
+     * @param {Number} num
+     * @returns {bitArray|Array}
+     */
+    serialize64bit: function(num){
+        return [Math.floor(num/0x100000000), (num|0)];
+    },
+
+    /**
+     * Deserializes 64bit number from bitArray
+     * @param {bitArray} arr
+     * @param {number} [offset] Default 0
+     */
+    deserialize64bit: function(arr, offset){
+        offset = offset || 0;
+        return (arr[offset]*0x100000000 + (arr[offset+1]) + (arr[offset+1] < 0 ? 0x100000000 : 0));
+    },
+
+    /**
      * Left zero padding to the even number of hexcoded digits.
      * @param x
      * @returns {*}
@@ -405,6 +559,34 @@ eb.misc = {
     padHexToSize: function(x, size){
         x = x.trim().replace(/[\s]+/g, '').replace(/^0x/, '');
         return (x.length<size) ? (('0'.repeat(size-x.length))+x) : x
+    },
+
+    /**
+     * Pads number x to full block size.
+     * Useful when computing total size after padding added.
+     * If x is multiple of bs, another block is added (pkcs7 works in this way).
+     *
+     * @param x number of units
+     * @param bs block size - same units as x
+     */
+    padToBlockSize: function(x, bs){
+        return x + (bs - (x % bs));
+    },
+
+    /**
+     * Returns the byte length of an utf8 string.
+     * @param str
+     * @returns {*}
+     */
+    strByteLength: function(str) {
+        var s = str.length;
+        for (var i=str.length-1; i>=0; i--) {
+            var code = str.charCodeAt(i);
+            if (code > 0x7f && code <= 0x7ff) s++;
+            else if (code > 0x7ff && code <= 0xffff) s+=2;
+            if (code >= 0xDC00 && code <= 0xDFFF) i--; //trail surrogate
+        }
+        return s;
     },
 
     /**
@@ -429,7 +611,7 @@ eb.misc = {
         var base32string = sjcl.codec.base32.fromBits(hashOut);
         return base32string.substring(0, size);
     },
-    
+
     /**
      * Generates checksum value from the input.
      * @param x an arbitraty string
@@ -437,6 +619,21 @@ eb.misc = {
      */
     genChecksumValueFromString: function(x, size){
         return eb.misc.genChecksumValue(sjcl.hash.sha256.hash(x), size);
+    },
+
+    /**
+     * Asserts the condition.
+     * @param condition
+     * @param message
+     */
+    assert: function(condition, message) {
+        if (!condition) {
+            message = message || "Assertion failed";
+            if (typeof Error !== "undefined") {
+                throw new Error(message);
+            }
+            throw message; // Fallback
+        }
     }
 };
 
@@ -794,11 +991,11 @@ eb.padding.pkcs15 = {
                 }while(curByte == 0);
             }
 
-           tmp = tmp << 8 | curByte;
-           if ((i&3) === 3) {
-                 ps.push(tmp);
-                 tmp = 0;
-           }
+            tmp = tmp << 8 | curByte;
+            if ((i&3) === 3) {
+                ps.push(tmp);
+                tmp = 0;
+            }
         }
         if (i&3) {
             ps.push(sjcl.bitArray.partial(8*(i&3), tmp));
@@ -933,7 +1130,7 @@ sjcl.misc.hmac_cbc.prototype.encrypt = sjcl.misc.hmac_cbc.prototype.mac = functi
 };
 
 /**
- * CBC encryption mode.
+ * CBC encryption mode implementation.
  * @type {{name: string, encrypt: sjcl.mode.cbc.encrypt, decrypt: sjcl.mode.cbc.decrypt}}
  */
 sjcl.mode.cbc = {
@@ -1008,12 +1205,15 @@ sjcl.mode.cbc = {
 eb.comm = {
     name: "comm",
 
+    REQ_METHOD_GET: "GET",
+    REQ_METHOD_POST: "POST",
+
     /**
      * General status constants.
      */
     status: {
         ERROR_CLASS_SECURITY:           0x2000,
-        
+
         ERROR_CLASS_WRONGDATA:          0x8000,
         SW_INVALID_TLV_FORMAT:          0x8000 | 0x04c,
         SW_WRONG_PADDING:               0x8000 | 0x03d,
@@ -1212,7 +1412,7 @@ eb.comm.processDataRequestBodyBuilder.prototype = {
     /**
      * Builds EB request.
      *
-     * @param plainData - bitArray of the plaintext data (will be MAC protected).
+     * @param plainData - bitArray of the plaintext data.
      * @param requestData - bitArray with userdata to perform operation on (will be encrypted, MAC protected)
      * @returns request body string.
      */
@@ -1246,7 +1446,7 @@ eb.comm.processDataRequestBodyBuilder.prototype = {
         var hmac = new sjcl.misc.hmac_cbc(aesMac, 16, eb.padding.empty);
 
         // IV is null, nonce in the first block is kind of IV.
-        var IV = h.toBits('00'.repeat(16));
+        var IV = [0, 0, 0, 0];
         var encryptedData = sjcl.mode.cbc.encrypt(aes, baBuff, IV, [], true);
         this._log('Encrypted ProcessData input ENC(PDIN): ' + h.fromBits(encryptedData) + ", len=" + ba.bitLength(encryptedData));
 
@@ -1658,7 +1858,7 @@ eb.comm.processDataResponseParser.inheritsFrom(eb.comm.responseParser, {
         }
 
         // IV is null, nonce in the first block is kind of IV.
-        var IV = h.toBits('00'.repeat(16));
+        var IV = [0, 0, 0, 0];
         var decryptedData = sjcl.mode.cbc.decrypt(aes, dataToDecrypt, IV, [], false);
         this._log("decryptedData: " + h.fromBits(decryptedData) + ", len=" + ba.bitLength(decryptedData));
 
@@ -1697,7 +1897,7 @@ eb.comm.connector.prototype = {
      * Method to do REST request with. GET or POST are allowed.
      * @input
      */
-    requestMethod: "POST",
+    requestMethod: eb.comm.REQ_METHOD_POST,
 
     /**
      * Scheme used to contact remote API.
@@ -1717,7 +1917,7 @@ eb.comm.connector.prototype = {
      * Endpoint where EB API listens
      * @input
      */
-    remoteEndpoint: "dragonfly.smarthsm.net",
+    remoteEndpoint: "site1.enigmabridge.com",
 
     /**
      * Port of the remote endpoint
@@ -1873,7 +2073,7 @@ eb.comm.connector.prototype = {
             type: this.requestMethod,
             dataType: 'json',
             timeout: this.requestTimeout,
-            data: this.requestMethod == "POST" ? JSON.stringify(apiData) : null
+            data: this.requestMethod == eb.comm.REQ_METHOD_POST ? JSON.stringify(apiData) : null
         };
 
         // Extend ajax settings with user provided settings.
@@ -1948,6 +2148,7 @@ eb.comm.connector.prototype = {
                         'jqXHR':jqXHR,
                         'textStatus':textStatus,
                         'response':this.response,
+                        'failType':eb.comm.status.PDATA_FAIL_RESPONSE_FAILED,
                         'requestObj':this
                     });
                 }
@@ -1959,6 +2160,7 @@ eb.comm.connector.prototype = {
                 this._failCallback(eb.comm.status.PDATA_FAIL_RESPONSE_PARSING, {
                     'jqXHR':jqXHR,
                     'textStatus':textStatus,
+                    'failType':eb.comm.status.PDATA_FAIL_RESPONSE_PARSING,
                     'requestObj':this,
                     'parseException':e
                 });
@@ -1982,6 +2184,7 @@ eb.comm.connector.prototype = {
                 'jqXHR':jqXHR,
                 'textStatus':textStatus,
                 'errorThrown':errorThrown,
+                'failType':eb.comm.status.PDATA_FAIL_CONNECTION,
                 'requestObj': this
             });
         }
@@ -2225,7 +2428,7 @@ eb.comm.apiRequest.inheritsFrom(eb.comm.connector, {
      * @returns {*}
      */
     getApiUrl: function(){
-        if (this.requestMethod == "POST" || (this.requestMethod == "GET" && !this.reqBody)){
+        if (this.requestMethod == eb.comm.REQ_METHOD_POST || (this.requestMethod == eb.comm.REQ_METHOD_GET && !this.reqBody)){
             return sprintf("%s://%s:%d/%s/%s/%s/%s",
                 this.requestScheme,
                 this.remoteEndpoint,
@@ -2235,7 +2438,7 @@ eb.comm.apiRequest.inheritsFrom(eb.comm.connector, {
                 this.callFunction,
                 this.getNonce());
 
-        } else if (this.requestMethod == "GET"){
+        } else if (this.requestMethod == eb.comm.REQ_METHOD_GET){
             return sprintf("%s://%s:%d/%s/%s/%s/%s%s",
                 this.requestScheme,
                 this.remoteEndpoint,
@@ -2259,7 +2462,7 @@ eb.comm.apiRequest.inheritsFrom(eb.comm.connector, {
      * @returns {*}
      */
     getApiRequestData: function(){
-        if (this.requestMethod == "POST") {
+        if (this.requestMethod == eb.comm.REQ_METHOD_POST) {
             return this.reqBody;
         } else {
             return {};
@@ -2358,16 +2561,19 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
         if ("userObjectId" in configObject){
             toConfig = $.extend(true, toConfig, {apiKeyLow4Bytes : configObject.userObjectId});
         }
+        if ("encKey" in configObject){
+            toConfig = $.extend(true, toConfig, {aesKey : configObject.encKey});
+        }
 
         // Configure with parent.
         eb.comm.processData.superclass.configure.call(this, toConfig);
 
         // Configure this.
         var ak = eb.misc.absorbKey;
-        ak(this, configObject, "aesKey");
-        ak(this, configObject, "macKey");
-        ak(this, configObject, "userObjectId");
-        ak(this, configObject, "callRequestType");
+        ak(this, toConfig, "aesKey");
+        ak(this, toConfig, "macKey");
+        ak(this, toConfig, "userObjectId");
+        ak(this, toConfig, "callRequestType");
     },
 
     /**
@@ -2428,7 +2634,7 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
      * @returns {*}
      */
     getApiUrl: function(){
-        if (this.requestMethod == "POST"){
+        if (this.requestMethod == eb.comm.REQ_METHOD_POST){
             return sprintf("%s://%s:%d/%s/%s/%s/%s",
                 this.requestScheme,
                 this.remoteEndpoint,
@@ -2438,7 +2644,7 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
                 this.callFunction,
                 this.getNonce());
 
-        } else if (this.requestMethod == "GET"){
+        } else if (this.requestMethod == eb.comm.REQ_METHOD_GET){
             return sprintf("%s://%s:%d/%s/%s/%s/%s/%s",
                 this.requestScheme,
                 this.remoteEndpoint,
@@ -2462,7 +2668,7 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
      * @returns {*}
      */
     getApiRequestData: function(){
-        if (this.requestMethod == "POST") {
+        if (this.requestMethod == eb.comm.REQ_METHOD_POST) {
             return this.reqBody;
         } else {
             return {};
@@ -2681,7 +2887,7 @@ eb.comm.hotp = {
         tpl = eb.padding.pkcs7.pad(tpl);
 
         // IV is null, nonce in the first block is kind of IV.
-        var IV = sjcl.codec.hex.toBits('00'.repeat(16));
+        var IV = [0, 0, 0, 0];
         var encryptedData = sjcl.mode.cbc.encrypt(aes, tpl, IV, [], true);
         var hmacData = hmac.mac(encryptedData);
 
@@ -3389,7 +3595,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         // Check for the plainData length = 0 was here, but protected data does not contain plain data,
         // it was moved to a different field in the response message so we don't check it here,
         // while original code in processUserAuthResponse does.
-        
+
         // Check main tag value.
         var tag = ba.extract(data, offset, 8);
         offset += 8;
