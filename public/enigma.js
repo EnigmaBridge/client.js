@@ -542,11 +542,14 @@ eb.misc = {
     /**
      * Deserializes 64bit number from bitArray
      * @param {bitArray} arr
-     * @param {number} [offset] Default 0
+     * @param {number} [offset=0] Bit offset.
      */
     deserialize64bit: function(arr, offset){
         offset = offset || 0;
-        return (arr[offset]*0x100000000 + (arr[offset+1]) + (arr[offset+1] < 0 ? 0x100000000 : 0));
+        var w = sjcl.bitArray;
+        var hi = w.extract32(arr, offset);
+        var lo = w.extract32(arr, offset+32);
+        return (hi*0x100000000 + (lo) + (lo < 0 ? 0x100000000 : 0));
     },
 
     /**
