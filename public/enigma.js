@@ -43,97 +43,191 @@ Function.prototype.inheritsFrom = function( parentClassOrObject, newPrototype ){
 /**
  * SHA1 implementation, not present in default SJCL.
  * We need it for HOTP.
- * @param a
  */
-sjcl.hash.sha1 = function(a) {
-    if (a) {
-        this._h = a._h.slice(0);
-        this._buffer = a._buffer.slice(0);
-        this._length = a._length
+/** Javascript SHA-1 implementation.
+ *
+ * Based on the implementation in RFC 3174, method 1, and on the SJCL
+ * SHA-256 implementation.
+ *
+ * @author Quinn Slack
+ */
+/**
+ * Context for a SHA-1 operation in progress.
+ * @constructor
+ * @class Secure Hash Algorithm, 160 bits.
+ */
+sjcl.hash.sha1 = function (hash) {
+    if (hash) {
+        this._h = hash._h.slice(0);
+        this._buffer = hash._buffer.slice(0);
+        this._length = hash._length;
     } else {
-        this.reset()
+        this.reset();
     }
 };
-sjcl.hash.sha1.hash = function(a) {
-    return (new sjcl.hash.sha1()).update(a).finalize()
+
+/**
+ * Hash a string or an array of words.
+ * @static
+ * @param {bitArray|String} data the data to hash.
+ * @return {bitArray} The hash value, an array of 5 big-endian words.
+ */
+sjcl.hash.sha1.hash = function (data) {
+    return (new sjcl.hash.sha1()).update(data).finalize();
 };
 sjcl.hash.sha1.prototype = {
+    /**
+     * The hash's block size, in bits.
+     * @constant
+     */
     blockSize: 512,
-    reset: function() {
+
+    /**
+     * Reset the hash state.
+     * @return this
+     */
+    reset:function () {
         this._h = this._init.slice(0);
         this._buffer = [];
         this._length = 0;
-        return this
+        return this;
     },
-    update: function(f) {
-        if (typeof f === "string") {
-            f = sjcl.codec.utf8String.toBits(f)
+
+    /**
+     * Input several words to the hash.
+     * @param {bitArray|String} data the data to hash.
+     * @return this
+     */
+    update: function (data) {
+        if (typeof data === "string") {
+            data = sjcl.codec.utf8String.toBits(data);
         }
-        var e, a = this._buffer = sjcl.bitArray.concat(this._buffer, f), d = this._length, c = this._length = d + sjcl.bitArray.bitLength(f);
-        for (e = this.blockSize + d & -this.blockSize; e <= c; e += this.blockSize) {
-            this._block(a.splice(0, 16))
-        }
-        return this
-    },
-    finalize: function() {
-        var c, a = this._buffer, d = this._h;
-        a = sjcl.bitArray.concat(a, [sjcl.bitArray.partial(1, 1)]);
-        for (c = a.length + 2; c & 15; c++) {
-            a.push(0)
-        }
-        a.push(Math.floor(this._length / 4294967296));
-        a.push(this._length | 0);
-        while (a.length) {
-            this._block(a.splice(0, 16))
-        }
-        this.reset();
-        return d
-    },
-    _init: [1732584193, 4023233417, 2562383102, 271733878, 3285377520],
-    _key: [1518500249, 1859775393, 2400959708, 3395469782],
-    _f: function(e, a, g, f) {
-        if (e <= 19) {
-            return (a & g) | (~a & f)
+        var i, b = this._buffer = sjcl.bitArray.concat(this._buffer, data),
+            ol = this._length,
+            nl = this._length = ol + sjcl.bitArray.bitLength(data);
+        if (typeof Uint32Array !== 'undefined') {
+            var c = new Uint32Array(b);
+            var j = 0;
+            for (i = this.blockSize+ol - ((this.blockSize+ol) & (this.blockSize-1)); i <= nl;
+                 i+= this.blockSize) {
+                this._block(c.subarray(16 * j, 16 * (j+1)));
+                j += 1;
+            }
+            b.splice(0, 16 * j);
         } else {
-            if (e <= 39) {
-                return a ^ g ^ f
-            } else {
-                if (e <= 59) {
-                    return (a & g) | (a & f) | (g & f)
-                } else {
-                    if (e <= 79) {
-                        return a ^ g ^ f
-                    }
-                }
+            for (i = this.blockSize+ol - ((this.blockSize+ol) & (this.blockSize-1)); i <= nl;
+                 i+= this.blockSize) {
+                this._block(b.splice(0,16));
             }
         }
+        return this;
     },
-    _S: function(b, a) {
-        return (a << b) | (a >>> 32 - b)
-    },
-    _block: function(n) {
-        var r, g, p, o, m, l, j, q = n.slice(0), i = this._h, f = this._key;
-        p = i[0];
-        o = i[1];
-        m = i[2];
-        l = i[3];
-        j = i[4];
-        for (r = 0; r <= 79; r++) {
-            if (r >= 16) {
-                q[r] = this._S(1, q[r - 3] ^ q[r - 8] ^ q[r - 14] ^ q[r - 16])
-            }
-            g = (this._S(5, p) + this._f(r, o, m, l) + j + q[r] + this._key[Math.floor(r / 20)]) | 0;
-            j = l;
-            l = m;
-            m = this._S(30, o);
-            o = p;
-            p = g
+
+    /**
+     * Complete hashing and output the hash value.
+     * @return {bitArray} The hash value, an array of 5 big-endian words. TODO
+     */
+    finalize:function () {
+        var i, b = this._buffer, h = this._h;
+
+        // Round out and push the buffer
+        b = sjcl.bitArray.concat(b, [sjcl.bitArray.partial(1,1)]);
+        // Round out the buffer to a multiple of 16 words, less the 2 length words.
+        for (i = b.length + 2; i & 15; i++) {
+            b.push(0);
         }
-        i[0] = (i[0] + p) | 0;
-        i[1] = (i[1] + o) | 0;
-        i[2] = (i[2] + m) | 0;
-        i[3] = (i[3] + l) | 0;
-        i[4] = (i[4] + j) | 0
+
+        // append the length
+        b.push(Math.floor(this._length / 0x100000000));
+        b.push(this._length | 0);
+
+        while (b.length) {
+            this._block(b.splice(0,16));
+        }
+
+        this.reset();
+        return h;
+    },
+
+    /**
+     * The SHA-1 initialization vector.
+     * @private
+     */
+    _init:[0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0],
+
+    /**
+     * The SHA-1 hash key.
+     * @private
+     */
+    _key:[0x5A827999, 0x6ED9EBA1, 0x8F1BBCDC, 0xCA62C1D6],
+
+    /**
+     * The SHA-1 logical functions f(0), f(1), ..., f(79).
+     * @private
+     */
+    _f:function(t, b, c, d) {
+        if (t <= 19) {
+            return (b & c) | (~b & d);
+        } else if (t <= 39) {
+            return b ^ c ^ d;
+        } else if (t <= 59) {
+            return (b & c) | (b & d) | (c & d);
+        } else if (t <= 79) {
+            return b ^ c ^ d;
+        }
+    },
+
+    /**
+     * Circular left-shift operator.
+     * @private
+     */
+    _S:function(n, x) {
+        return (x << n) | (x >>> 32-n);
+    },
+
+    /**
+     * Perform one cycle of SHA-1.
+     * @param {Uint32Array|bitArray} words one block of words.
+     * @private
+     */
+    _block:function (words) {
+        var t, tmp, a, b, c, d, e,
+            h = this._h;
+        var w;
+        if (typeof Uint32Array !== 'undefined') {
+            // When words is passed to _block, it has 16 elements. SHA1 _block
+            // function extends words with new elements (at the end there are 80 elements).
+            // The problem is that if we use Uint32Array instead of Array,
+            // the length of Uint32Array cannot be changed. Thus, we replace words with a
+            // normal Array here.
+            w = Array(80); // do not use Uint32Array here as the instantiation is slower
+            for (var j=0; j<16; j++){
+                w[j] = words[j];
+            }
+        } else {
+            w = words;
+        }
+
+        a = h[0]; b = h[1]; c = h[2]; d = h[3]; e = h[4];
+
+        for (t=0; t<=79; t++) {
+            if (t >= 16) {
+                w[t] = this._S(1, w[t-3] ^ w[t-8] ^ w[t-14] ^ w[t-16]);
+            }
+            tmp = (this._S(5, a) + this._f(t, b, c, d) + e + w[t] +
+                this._key[Math.floor(t/20)]) | 0;
+            e = d;
+            d = c;
+            c = this._S(30, b);
+            b = a;
+            a = tmp;
+        }
+
+        h[0] = (h[0]+a) |0;
+        h[1] = (h[1]+b) |0;
+        h[2] = (h[2]+c) |0;
+        h[3] = (h[3]+d) |0;
+        h[4] = (h[4]+e) |0;
     }
 };
 
@@ -229,24 +323,25 @@ sjcl.codec.base32hex = {
  */
 var eb = {
     name: "EB",
-    /** @namespace Exceptions. */
-    exception: {
-        /** @constructor Ciphertext is corrupt. */
-        corrupt: function (message) {
-            this.toString = function () {
-                return "CORRUPT: " + this.message;
-            };
-            this.message = message;
-        },
-        /** @constructor Invalid input. */
-        invalid: function (message) {
-            this.toString = function () {
-                return "INVALID: " + this.message;
-            };
-            this.message = message;
-        },
-    }
 };
+
+/** @namespace Exceptions. */
+eb.exception = {
+    /** @constructor Ciphertext is corrupt. */
+    corrupt: function (message) {
+        this.toString = function () {
+            return "CORRUPT: " + this.message;
+        };
+        this.message = message;
+    },
+    /** @constructor Invalid input. */
+    invalid: function (message) {
+        this.toString = function () {
+            return "INVALID: " + this.message;
+        };
+        this.message = message;
+    },
+}
 
 /**
  * EB misc wrapper.
@@ -254,6 +349,11 @@ var eb = {
  */
 eb.misc = {
     name: "misc",
+
+    MAX_SAFE_INTEGER: Math.pow(2, 53) - 1,
+    MIN_SAFE_INTEGER: -(Math.pow(2, 53) - 1),
+    EPSILON: 2.2204460492503130808472633361816E-16,
+
     genNonce: function(length, alphabet){
         var nonce = "";
         var alphabetLen = alphabet.length;
@@ -273,6 +373,9 @@ eb.misc = {
     },
     xor: function(x,y){
         return [x[0]^y[0],x[1]^y[1],x[2]^y[2],x[3]^y[3]];
+    },
+    xor8: function(x,y){
+        return [x[0]^y[0],x[1]^y[1],x[2]^y[2],x[3]^y[3],x[4]^y[4],x[5]^y[5],x[6]^y[6],x[7]^y[7]];
     },
     absorb: function(dst, src){
         if (src === undefined){
@@ -387,6 +490,69 @@ eb.misc = {
     },
 
     /**
+     * Function generates a zero bit vector of given size.
+     * @param bitLength
+     */
+    getZeroBits: function(bitLength){
+        if (bitLength <= 0) {
+            return [];
+        }
+
+        var bs = [0, 0, 0, 0,   0, 0, 0, 0], i;
+        for(i=256; i<bitLength; i+=32){
+            bs.push(0);
+        }
+
+        return sjcl.bitArray.bitSlice(bs, 0, bitLength);
+    },
+
+    /**
+     * Function generates random bit vector of given length.
+     * @param bitLength
+     */
+    getRandomBits: function(bitLength){
+        return sjcl.bitArray.clamp(sjcl.random.randomWords(Math.ceil(bitLength/32)), bitLength);
+    },
+
+    /**
+     * Converts given number to the bitArray representation.
+     *
+     * @param num
+     * @param bitSize
+     */
+    numberToBits: function(num, bitSize){
+        if (bitSize > 32){
+            throw new eb.exception.invalid("num can be maximally 32bit wide");
+        }
+        if (bitSize == 32){
+            return [num];
+        }
+        return sjcl.bitArray.bitSlice([num], 32-bitSize, 32);
+    },
+
+    /**
+     * Serializes 64bit number to a bitArray.
+     * @param {Number} num
+     * @returns {bitArray|Array}
+     */
+    serialize64bit: function(num){
+        return [Math.floor(num/0x100000000), (num|0)];
+    },
+
+    /**
+     * Deserializes 64bit number from bitArray
+     * @param {bitArray} arr
+     * @param {number} [offset=0] Bit offset.
+     */
+    deserialize64bit: function(arr, offset){
+        offset = offset || 0;
+        var w = sjcl.bitArray;
+        var hi = w.extract32(arr, offset);
+        var lo = w.extract32(arr, offset+32);
+        return (hi*0x100000000 + (lo) + (lo < 0 ? 0x100000000 : 0));
+    },
+
+    /**
      * Left zero padding to the even number of hexcoded digits.
      * @param x
      * @returns {*}
@@ -405,6 +571,34 @@ eb.misc = {
     padHexToSize: function(x, size){
         x = x.trim().replace(/[\s]+/g, '').replace(/^0x/, '');
         return (x.length<size) ? (('0'.repeat(size-x.length))+x) : x
+    },
+
+    /**
+     * Pads number x to full block size.
+     * Useful when computing total size after padding added.
+     * If x is multiple of bs, another block is added (pkcs7 works in this way).
+     *
+     * @param x number of units
+     * @param bs block size - same units as x
+     */
+    padToBlockSize: function(x, bs){
+        return x + (bs - (x % bs));
+    },
+
+    /**
+     * Returns the byte length of an utf8 string.
+     * @param str
+     * @returns {*}
+     */
+    strByteLength: function(str) {
+        var s = str.length;
+        for (var i=str.length-1; i>=0; i--) {
+            var code = str.charCodeAt(i);
+            if (code > 0x7f && code <= 0x7ff) s++;
+            else if (code > 0x7ff && code <= 0xffff) s+=2;
+            if (code >= 0xDC00 && code <= 0xDFFF) i--; //trail surrogate
+        }
+        return s;
     },
 
     /**
@@ -429,7 +623,7 @@ eb.misc = {
         var base32string = sjcl.codec.base32.fromBits(hashOut);
         return base32string.substring(0, size);
     },
-    
+
     /**
      * Generates checksum value from the input.
      * @param x an arbitraty string
@@ -437,6 +631,21 @@ eb.misc = {
      */
     genChecksumValueFromString: function(x, size){
         return eb.misc.genChecksumValue(sjcl.hash.sha256.hash(x), size);
+    },
+
+    /**
+     * Asserts the condition.
+     * @param condition
+     * @param message
+     */
+    assert: function(condition, message) {
+        if (!condition) {
+            message = message || "Assertion failed";
+            if (typeof Error !== "undefined") {
+                throw new Error(message);
+            }
+            throw message; // Fallback
+        }
     }
 };
 
@@ -794,11 +1003,11 @@ eb.padding.pkcs15 = {
                 }while(curByte == 0);
             }
 
-           tmp = tmp << 8 | curByte;
-           if ((i&3) === 3) {
-                 ps.push(tmp);
-                 tmp = 0;
-           }
+            tmp = tmp << 8 | curByte;
+            if ((i&3) === 3) {
+                ps.push(tmp);
+                tmp = 0;
+            }
         }
         if (i&3) {
             ps.push(sjcl.bitArray.partial(8*(i&3), tmp));
@@ -933,7 +1142,7 @@ sjcl.misc.hmac_cbc.prototype.encrypt = sjcl.misc.hmac_cbc.prototype.mac = functi
 };
 
 /**
- * CBC encryption mode.
+ * CBC encryption mode implementation.
  * @type {{name: string, encrypt: sjcl.mode.cbc.encrypt, decrypt: sjcl.mode.cbc.decrypt}}
  */
 sjcl.mode.cbc = {
@@ -1008,12 +1217,15 @@ sjcl.mode.cbc = {
 eb.comm = {
     name: "comm",
 
+    REQ_METHOD_GET: "GET",
+    REQ_METHOD_POST: "POST",
+
     /**
      * General status constants.
      */
     status: {
         ERROR_CLASS_SECURITY:           0x2000,
-        
+
         ERROR_CLASS_WRONGDATA:          0x8000,
         SW_INVALID_TLV_FORMAT:          0x8000 | 0x04c,
         SW_WRONG_PADDING:               0x8000 | 0x03d,
@@ -1212,7 +1424,7 @@ eb.comm.processDataRequestBodyBuilder.prototype = {
     /**
      * Builds EB request.
      *
-     * @param plainData - bitArray of the plaintext data (will be MAC protected).
+     * @param plainData - bitArray of the plaintext data.
      * @param requestData - bitArray with userdata to perform operation on (will be encrypted, MAC protected)
      * @returns request body string.
      */
@@ -1238,15 +1450,15 @@ eb.comm.processDataRequestBodyBuilder.prototype = {
         baBuff = pad.pad(baBuff);
         this._log('ProcessData function input PDIN (0x1f | <UOID-4B> | <nonce-8B> | data | pkcs#7padding) : ' + h.fromBits(baBuff) + "; len: " + ba.bitLength(baBuff));
 
-        var aesKeyBits = h.toBits(this.aesKey);
-        var macKeyBits = h.toBits(this.macKey);
+        var aesKeyBits = eb.misc.inputToBits(this.aesKey);
+        var macKeyBits = eb.misc.inputToBits(this.macKey);
 
         var aes = new sjcl.cipher.aes(aesKeyBits);
         var aesMac = new sjcl.cipher.aes(macKeyBits);
         var hmac = new sjcl.misc.hmac_cbc(aesMac, 16, eb.padding.empty);
 
         // IV is null, nonce in the first block is kind of IV.
-        var IV = h.toBits('00'.repeat(16));
+        var IV = [0, 0, 0, 0];
         var encryptedData = sjcl.mode.cbc.encrypt(aes, baBuff, IV, [], true);
         this._log('Encrypted ProcessData input ENC(PDIN): ' + h.fromBits(encryptedData) + ", len=" + ba.bitLength(encryptedData));
 
@@ -1628,8 +1840,8 @@ eb.comm.processDataResponseParser.inheritsFrom(eb.comm.responseParser, {
         var protectedBitsBl = ba.bitLength(protectedBits);
 
         // Decrypt and verify
-        var aesKeyBits = h.toBits(this.aesKey);
-        var macKeyBits = h.toBits(this.macKey);
+        var aesKeyBits = eb.misc.inputToBits(this.aesKey);
+        var macKeyBits = eb.misc.inputToBits(this.macKey);
         var aes = new sjcl.cipher.aes(aesKeyBits);
         var aesMac = new sjcl.cipher.aes(macKeyBits);
         var hmac = new sjcl.misc.hmac_cbc(aesMac, 16, eb.padding.empty);
@@ -1658,7 +1870,7 @@ eb.comm.processDataResponseParser.inheritsFrom(eb.comm.responseParser, {
         }
 
         // IV is null, nonce in the first block is kind of IV.
-        var IV = h.toBits('00'.repeat(16));
+        var IV = [0, 0, 0, 0];
         var decryptedData = sjcl.mode.cbc.decrypt(aes, dataToDecrypt, IV, [], false);
         this._log("decryptedData: " + h.fromBits(decryptedData) + ", len=" + ba.bitLength(decryptedData));
 
@@ -1697,7 +1909,7 @@ eb.comm.connector.prototype = {
      * Method to do REST request with. GET or POST are allowed.
      * @input
      */
-    requestMethod: "POST",
+    requestMethod: eb.comm.REQ_METHOD_POST,
 
     /**
      * Scheme used to contact remote API.
@@ -1717,7 +1929,7 @@ eb.comm.connector.prototype = {
      * Endpoint where EB API listens
      * @input
      */
-    remoteEndpoint: "dragonfly.smarthsm.net",
+    remoteEndpoint: "site1.enigmabridge.com",
 
     /**
      * Port of the remote endpoint
@@ -1873,7 +2085,7 @@ eb.comm.connector.prototype = {
             type: this.requestMethod,
             dataType: 'json',
             timeout: this.requestTimeout,
-            data: this.requestMethod == "POST" ? JSON.stringify(apiData) : null
+            data: this.requestMethod == eb.comm.REQ_METHOD_POST ? JSON.stringify(apiData) : null
         };
 
         // Extend ajax settings with user provided settings.
@@ -1948,6 +2160,7 @@ eb.comm.connector.prototype = {
                         'jqXHR':jqXHR,
                         'textStatus':textStatus,
                         'response':this.response,
+                        'failType':eb.comm.status.PDATA_FAIL_RESPONSE_FAILED,
                         'requestObj':this
                     });
                 }
@@ -1959,6 +2172,7 @@ eb.comm.connector.prototype = {
                 this._failCallback(eb.comm.status.PDATA_FAIL_RESPONSE_PARSING, {
                     'jqXHR':jqXHR,
                     'textStatus':textStatus,
+                    'failType':eb.comm.status.PDATA_FAIL_RESPONSE_PARSING,
                     'requestObj':this,
                     'parseException':e
                 });
@@ -1982,6 +2196,7 @@ eb.comm.connector.prototype = {
                 'jqXHR':jqXHR,
                 'textStatus':textStatus,
                 'errorThrown':errorThrown,
+                'failType':eb.comm.status.PDATA_FAIL_CONNECTION,
                 'requestObj': this
             });
         }
@@ -2225,7 +2440,7 @@ eb.comm.apiRequest.inheritsFrom(eb.comm.connector, {
      * @returns {*}
      */
     getApiUrl: function(){
-        if (this.requestMethod == "POST" || (this.requestMethod == "GET" && !this.reqBody)){
+        if (this.requestMethod == eb.comm.REQ_METHOD_POST || (this.requestMethod == eb.comm.REQ_METHOD_GET && !this.reqBody)){
             return sprintf("%s://%s:%d/%s/%s/%s/%s",
                 this.requestScheme,
                 this.remoteEndpoint,
@@ -2235,7 +2450,7 @@ eb.comm.apiRequest.inheritsFrom(eb.comm.connector, {
                 this.callFunction,
                 this.getNonce());
 
-        } else if (this.requestMethod == "GET"){
+        } else if (this.requestMethod == eb.comm.REQ_METHOD_GET){
             return sprintf("%s://%s:%d/%s/%s/%s/%s%s",
                 this.requestScheme,
                 this.remoteEndpoint,
@@ -2259,7 +2474,7 @@ eb.comm.apiRequest.inheritsFrom(eb.comm.connector, {
      * @returns {*}
      */
     getApiRequestData: function(){
-        if (this.requestMethod == "POST") {
+        if (this.requestMethod == eb.comm.REQ_METHOD_POST) {
             return this.reqBody;
         } else {
             return {};
@@ -2358,16 +2573,19 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
         if ("userObjectId" in configObject){
             toConfig = $.extend(true, toConfig, {apiKeyLow4Bytes : configObject.userObjectId});
         }
+        if ("encKey" in configObject){
+            toConfig = $.extend(true, toConfig, {aesKey : configObject.encKey});
+        }
 
         // Configure with parent.
         eb.comm.processData.superclass.configure.call(this, toConfig);
 
         // Configure this.
         var ak = eb.misc.absorbKey;
-        ak(this, configObject, "aesKey");
-        ak(this, configObject, "macKey");
-        ak(this, configObject, "userObjectId");
-        ak(this, configObject, "callRequestType");
+        ak(this, toConfig, "aesKey");
+        ak(this, toConfig, "macKey");
+        ak(this, toConfig, "userObjectId");
+        ak(this, toConfig, "callRequestType");
     },
 
     /**
@@ -2428,7 +2646,7 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
      * @returns {*}
      */
     getApiUrl: function(){
-        if (this.requestMethod == "POST"){
+        if (this.requestMethod == eb.comm.REQ_METHOD_POST){
             return sprintf("%s://%s:%d/%s/%s/%s/%s",
                 this.requestScheme,
                 this.remoteEndpoint,
@@ -2438,7 +2656,7 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
                 this.callFunction,
                 this.getNonce());
 
-        } else if (this.requestMethod == "GET"){
+        } else if (this.requestMethod == eb.comm.REQ_METHOD_GET){
             return sprintf("%s://%s:%d/%s/%s/%s/%s/%s",
                 this.requestScheme,
                 this.remoteEndpoint,
@@ -2462,7 +2680,7 @@ eb.comm.processData.inheritsFrom(eb.comm.apiRequest, {
      * @returns {*}
      */
     getApiRequestData: function(){
-        if (this.requestMethod == "POST") {
+        if (this.requestMethod == eb.comm.REQ_METHOD_POST) {
             return this.reqBody;
         } else {
             return {};
@@ -2681,7 +2899,7 @@ eb.comm.hotp = {
         tpl = eb.padding.pkcs7.pad(tpl);
 
         // IV is null, nonce in the first block is kind of IV.
-        var IV = sjcl.codec.hex.toBits('00'.repeat(16));
+        var IV = [0, 0, 0, 0];
         var encryptedData = sjcl.mode.cbc.encrypt(aes, tpl, IV, [], true);
         var hmacData = hmac.mac(encryptedData);
 
@@ -3389,7 +3607,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
         // Check for the plainData length = 0 was here, but protected data does not contain plain data,
         // it was moved to a different field in the response message so we don't check it here,
         // while original code in processUserAuthResponse does.
-        
+
         // Check main tag value.
         var tag = ba.extract(data, offset, 8);
         offset += 8;
@@ -3906,6 +4124,1260 @@ eb.comm.hotp.authContextUpdateRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
             data.response = this.response;
             this.failCallbackOrig(eb.comm.status.PDATA_FAIL_RESPONSE_FAILED, data);
         }
+    }
+});
+
+// <jsbn>
+// Copyright (c) 2005  Tom Wu
+// All Rights Reserved.
+// See "LICENSE" for details.
+
+// Basic JavaScript BN library - subset useful for RSA encryption.
+(function (factory) {
+    if(typeof DO_NOT_EXPORT_BIGINTEGER === 'undefined') {
+        if('object' === typeof exports) {
+            factory(exports);
+        } else if ('function' === typeof define && define.amd) {
+            define(function () {
+                var module = {};
+                factory(module);
+                return module;
+            });
+        } else {
+            factory(eb.math = {});
+        }
+    } else {
+        factory(eb.math = {});
+    }
+}(function(BigIntegerModule)
+{
+    // Basic JavaScript BN library - subset useful for RSA encryption.
+    // Bits per digit
+    var dbits;
+
+    // JavaScript engine analysis
+    var canary = 0xdeadbeefcafe;
+    var j_lm = ((canary&0xffffff)==0xefcafe);
+
+    // (public) Constructor
+    function BigInteger(a,b,c) {
+        if(a != null)
+            if("number" == typeof a) this.fromNumber(a,b,c);
+            else if(b == null && "string" != typeof a) this.fromString(a,256);
+            else this.fromString(a,b);
+    }
+    BigIntegerModule.BigInteger = BigInteger;
+
+    // return new, unset BigInteger
+    function nbi() { return new BigInteger(null); }
+
+    // am: Compute w_j += (x*this_i), propagate carries,
+    // c is initial carry, returns final carry.
+    // c < 3*dvalue, x < 2*dvalue, this_i < dvalue
+    // We need to select the fastest one that works in this environment.
+
+    // am1: use a single mult and divide to get the high bits,
+    // max digit bits should be 26 because
+    // max internal value = 2*dvalue^2-2*dvalue (< 2^53)
+    function am1(i,x,w,j,c,n) {
+        while(--n >= 0) {
+            var v = x*this[i++]+w[j]+c;
+            c = Math.floor(v/0x4000000);
+            w[j++] = v&0x3ffffff;
+        }
+        return c;
+    }
+    // am2 avoids a big mult-and-extract completely.
+    // Max digit bits should be <= 30 because we do bitwise ops
+    // on values up to 2*hdvalue^2-hdvalue-1 (< 2^31)
+    function am2(i,x,w,j,c,n) {
+        var xl = x&0x7fff, xh = x>>15;
+        while(--n >= 0) {
+            var l = this[i]&0x7fff;
+            var h = this[i++]>>15;
+            var m = xh*l+h*xl;
+            l = xl*l+((m&0x7fff)<<15)+w[j]+(c&0x3fffffff);
+            c = (l>>>30)+(m>>>15)+xh*h+(c>>>30);
+            w[j++] = l&0x3fffffff;
+        }
+        return c;
+    }
+    // Alternately, set max digit bits to 28 since some
+    // browsers slow down when dealing with 32-bit numbers.
+    function am3(i,x,w,j,c,n) {
+        var xl = x&0x3fff, xh = x>>14;
+        while(--n >= 0) {
+            var l = this[i]&0x3fff;
+            var h = this[i++]>>14;
+            var m = xh*l+h*xl;
+            l = xl*l+((m&0x3fff)<<14)+w[j]+c;
+            c = (l>>28)+(m>>14)+xh*h;
+            w[j++] = l&0xfffffff;
+        }
+        return c;
+    }
+    if(j_lm && (navigator.appName == "Microsoft Internet Explorer")) {
+        BigInteger.prototype.am = am2;
+        dbits = 30;
+    }
+    else if(j_lm && (navigator.appName != "Netscape")) {
+        BigInteger.prototype.am = am1;
+        dbits = 26;
+    }
+    else { // Mozilla/Netscape seems to prefer am3
+        BigInteger.prototype.am = am3;
+        dbits = 28;
+    }
+
+    BigInteger.prototype.DB = dbits;
+    BigInteger.prototype.DM = ((1<<dbits)-1);
+    BigInteger.prototype.DV = (1<<dbits);
+
+    var BI_FP = 52;
+    BigInteger.prototype.FV = Math.pow(2,BI_FP);
+    BigInteger.prototype.F1 = BI_FP-dbits;
+    BigInteger.prototype.F2 = 2*dbits-BI_FP;
+
+    // Digit conversions
+    var BI_RM = "0123456789abcdefghijklmnopqrstuvwxyz";
+    var BI_RC = new Array();
+    var rr,vv;
+    rr = "0".charCodeAt(0);
+    for(vv = 0; vv <= 9; ++vv) BI_RC[rr++] = vv;
+    rr = "a".charCodeAt(0);
+    for(vv = 10; vv < 36; ++vv) BI_RC[rr++] = vv;
+    rr = "A".charCodeAt(0);
+    for(vv = 10; vv < 36; ++vv) BI_RC[rr++] = vv;
+
+    function int2char(n) { return BI_RM.charAt(n); }
+    function intAt(s,i) {
+        var c = BI_RC[s.charCodeAt(i)];
+        return (c==null)?-1:c;
+    }
+
+    // (protected) copy this to r
+    function bnpCopyTo(r) {
+        for(var i = this.t-1; i >= 0; --i) r[i] = this[i];
+        r.t = this.t;
+        r.s = this.s;
+    }
+
+    // (protected) set from integer value x, -DV <= x < DV
+    function bnpFromInt(x) {
+        this.t = 1;
+        this.s = (x<0)?-1:0;
+        if(x > 0) this[0] = x;
+        else if(x < -1) this[0] = x+this.DV;
+        else this.t = 0;
+    }
+
+    // return bigint initialized to value
+    function nbv(i) { var r = nbi(); r.fromInt(i); return r; }
+
+    // (protected) set from string and radix
+    function bnpFromString(s,b) {
+        var k;
+        if(b == 16) k = 4;
+        else if(b == 8) k = 3;
+        else if(b == 256) k = 8; // byte array
+        else if(b == 2) k = 1;
+        else if(b == 32) k = 5;
+        else if(b == 4) k = 2;
+        else { this.fromRadix(s,b); return; }
+        this.t = 0;
+        this.s = 0;
+        var i = s.length, mi = false, sh = 0;
+        while(--i >= 0) {
+            var x = (k==8)?s[i]&0xff:intAt(s,i);
+            if(x < 0) {
+                if(s.charAt(i) == "-") mi = true;
+                continue;
+            }
+            mi = false;
+            if(sh == 0)
+                this[this.t++] = x;
+            else if(sh+k > this.DB) {
+                this[this.t-1] |= (x&((1<<(this.DB-sh))-1))<<sh;
+                this[this.t++] = (x>>(this.DB-sh));
+            }
+            else
+                this[this.t-1] |= x<<sh;
+            sh += k;
+            if(sh >= this.DB) sh -= this.DB;
+        }
+        if(k == 8 && (s[0]&0x80) != 0) {
+            this.s = -1;
+            if(sh > 0) this[this.t-1] |= ((1<<(this.DB-sh))-1)<<sh;
+        }
+        this.clamp();
+        if(mi) BigInteger.ZERO.subTo(this,this);
+    }
+
+    // (protected) clamp off excess high words
+    function bnpClamp() {
+        var c = this.s&this.DM;
+        while(this.t > 0 && this[this.t-1] == c) --this.t;
+    }
+
+    // (public) return string representation in given radix
+    function bnToString(b) {
+        if(this.s < 0) return "-"+this.negate().toString(b);
+        var k;
+        if(b == 16) k = 4;
+        else if(b == 8) k = 3;
+        else if(b == 2) k = 1;
+        else if(b == 32) k = 5;
+        else if(b == 4) k = 2;
+        else return this.toRadix(b);
+        var km = (1<<k)-1, d, m = false, r = "", i = this.t;
+        var p = this.DB-(i*this.DB)%k;
+        if(i-- > 0) {
+            if(p < this.DB && (d = this[i]>>p) > 0) { m = true; r = int2char(d); }
+            while(i >= 0) {
+                if(p < k) {
+                    d = (this[i]&((1<<p)-1))<<(k-p);
+                    d |= this[--i]>>(p+=this.DB-k);
+                }
+                else {
+                    d = (this[i]>>(p-=k))&km;
+                    if(p <= 0) { p += this.DB; --i; }
+                }
+                if(d > 0) m = true;
+                if(m) r += int2char(d);
+            }
+        }
+        return m?r:"0";
+    }
+
+    // (public) -this
+    function bnNegate() { var r = nbi(); BigInteger.ZERO.subTo(this,r); return r; }
+
+    // (public) |this|
+    function bnAbs() { return (this.s<0)?this.negate():this; }
+
+    // (public) return + if this > a, - if this < a, 0 if equal
+    function bnCompareTo(a) {
+        var r = this.s-a.s;
+        if(r != 0) return r;
+        var i = this.t;
+        r = i-a.t;
+        if(r != 0) return (this.s<0)?-r:r;
+        while(--i >= 0) if((r=this[i]-a[i]) != 0) return r;
+        return 0;
+    }
+
+    // returns bit length of the integer x
+    function nbits(x) {
+        var r = 1, t;
+        if((t=x>>>16) != 0) { x = t; r += 16; }
+        if((t=x>>8) != 0) { x = t; r += 8; }
+        if((t=x>>4) != 0) { x = t; r += 4; }
+        if((t=x>>2) != 0) { x = t; r += 2; }
+        if((t=x>>1) != 0) { x = t; r += 1; }
+        return r;
+    }
+
+    // (public) return the number of bits in "this"
+    function bnBitLength() {
+        if(this.t <= 0) return 0;
+        return this.DB*(this.t-1)+nbits(this[this.t-1]^(this.s&this.DM));
+    }
+
+    // (protected) r = this << n*DB
+    function bnpDLShiftTo(n,r) {
+        var i;
+        for(i = this.t-1; i >= 0; --i) r[i+n] = this[i];
+        for(i = n-1; i >= 0; --i) r[i] = 0;
+        r.t = this.t+n;
+        r.s = this.s;
+    }
+
+    // (protected) r = this >> n*DB
+    function bnpDRShiftTo(n,r) {
+        for(var i = n; i < this.t; ++i) r[i-n] = this[i];
+        r.t = Math.max(this.t-n,0);
+        r.s = this.s;
+    }
+
+    // (protected) r = this << n
+    function bnpLShiftTo(n,r) {
+        var bs = n%this.DB;
+        var cbs = this.DB-bs;
+        var bm = (1<<cbs)-1;
+        var ds = Math.floor(n/this.DB), c = (this.s<<bs)&this.DM, i;
+        for(i = this.t-1; i >= 0; --i) {
+            r[i+ds+1] = (this[i]>>cbs)|c;
+            c = (this[i]&bm)<<bs;
+        }
+        for(i = ds-1; i >= 0; --i) r[i] = 0;
+        r[ds] = c;
+        r.t = this.t+ds+1;
+        r.s = this.s;
+        r.clamp();
+    }
+
+    // (protected) r = this >> n
+    function bnpRShiftTo(n,r) {
+        r.s = this.s;
+        var ds = Math.floor(n/this.DB);
+        if(ds >= this.t) { r.t = 0; return; }
+        var bs = n%this.DB;
+        var cbs = this.DB-bs;
+        var bm = (1<<bs)-1;
+        r[0] = this[ds]>>bs;
+        for(var i = ds+1; i < this.t; ++i) {
+            r[i-ds-1] |= (this[i]&bm)<<cbs;
+            r[i-ds] = this[i]>>bs;
+        }
+        if(bs > 0) r[this.t-ds-1] |= (this.s&bm)<<cbs;
+        r.t = this.t-ds;
+        r.clamp();
+    }
+
+    // (protected) r = this - a
+    function bnpSubTo(a,r) {
+        var i = 0, c = 0, m = Math.min(a.t,this.t);
+        while(i < m) {
+            c += this[i]-a[i];
+            r[i++] = c&this.DM;
+            c >>= this.DB;
+        }
+        if(a.t < this.t) {
+            c -= a.s;
+            while(i < this.t) {
+                c += this[i];
+                r[i++] = c&this.DM;
+                c >>= this.DB;
+            }
+            c += this.s;
+        }
+        else {
+            c += this.s;
+            while(i < a.t) {
+                c -= a[i];
+                r[i++] = c&this.DM;
+                c >>= this.DB;
+            }
+            c -= a.s;
+        }
+        r.s = (c<0)?-1:0;
+        if(c < -1) r[i++] = this.DV+c;
+        else if(c > 0) r[i++] = c;
+        r.t = i;
+        r.clamp();
+    }
+
+    // (protected) r = this * a, r != this,a (HAC 14.12)
+    // "this" should be the larger one if appropriate.
+    function bnpMultiplyTo(a,r) {
+        var x = this.abs(), y = a.abs();
+        var i = x.t;
+        r.t = i+y.t;
+        while(--i >= 0) r[i] = 0;
+        for(i = 0; i < y.t; ++i) r[i+x.t] = x.am(0,y[i],r,i,0,x.t);
+        r.s = 0;
+        r.clamp();
+        if(this.s != a.s) BigInteger.ZERO.subTo(r,r);
+    }
+
+    // (protected) r = this^2, r != this (HAC 14.16)
+    function bnpSquareTo(r) {
+        var x = this.abs();
+        var i = r.t = 2*x.t;
+        while(--i >= 0) r[i] = 0;
+        for(i = 0; i < x.t-1; ++i) {
+            var c = x.am(i,x[i],r,2*i,0,1);
+            if((r[i+x.t]+=x.am(i+1,2*x[i],r,2*i+1,c,x.t-i-1)) >= x.DV) {
+                r[i+x.t] -= x.DV;
+                r[i+x.t+1] = 1;
+            }
+        }
+        if(r.t > 0) r[r.t-1] += x.am(i,x[i],r,2*i,0,1);
+        r.s = 0;
+        r.clamp();
+    }
+
+    // (protected) divide this by m, quotient and remainder to q, r (HAC 14.20)
+    // r != q, this != m.  q or r may be null.
+    function bnpDivRemTo(m,q,r) {
+        var pm = m.abs();
+        if(pm.t <= 0) return;
+        var pt = this.abs();
+        if(pt.t < pm.t) {
+            if(q != null) q.fromInt(0);
+            if(r != null) this.copyTo(r);
+            return;
+        }
+        if(r == null) r = nbi();
+        var y = nbi(), ts = this.s, ms = m.s;
+        var nsh = this.DB-nbits(pm[pm.t-1]);	// normalize modulus
+        if(nsh > 0) { pm.lShiftTo(nsh,y); pt.lShiftTo(nsh,r); }
+        else { pm.copyTo(y); pt.copyTo(r); }
+        var ys = y.t;
+        var y0 = y[ys-1];
+        if(y0 == 0) return;
+        var yt = y0*(1<<this.F1)+((ys>1)?y[ys-2]>>this.F2:0);
+        var d1 = this.FV/yt, d2 = (1<<this.F1)/yt, e = 1<<this.F2;
+        var i = r.t, j = i-ys, t = (q==null)?nbi():q;
+        y.dlShiftTo(j,t);
+        if(r.compareTo(t) >= 0) {
+            r[r.t++] = 1;
+            r.subTo(t,r);
+        }
+        BigInteger.ONE.dlShiftTo(ys,t);
+        t.subTo(y,y);	// "negative" y so we can replace sub with am later
+        while(y.t < ys) y[y.t++] = 0;
+        while(--j >= 0) {
+            // Estimate quotient digit
+            var qd = (r[--i]==y0)?this.DM:Math.floor(r[i]*d1+(r[i-1]+e)*d2);
+            if((r[i]+=y.am(0,qd,r,j,0,ys)) < qd) {	// Try it out
+                y.dlShiftTo(j,t);
+                r.subTo(t,r);
+                while(r[i] < --qd) r.subTo(t,r);
+            }
+        }
+        if(q != null) {
+            r.drShiftTo(ys,q);
+            if(ts != ms) BigInteger.ZERO.subTo(q,q);
+        }
+        r.t = ys;
+        r.clamp();
+        if(nsh > 0) r.rShiftTo(nsh,r);	// Denormalize remainder
+        if(ts < 0) BigInteger.ZERO.subTo(r,r);
+    }
+
+    // (public) this mod a
+    function bnMod(a) {
+        var r = nbi();
+        this.abs().divRemTo(a,null,r);
+        if(this.s < 0 && r.compareTo(BigInteger.ZERO) > 0) a.subTo(r,r);
+        return r;
+    }
+
+    // Modular reduction using "classic" algorithm
+    function Classic(m) { this.m = m; }
+    function cConvert(x) {
+        if(x.s < 0 || x.compareTo(this.m) >= 0) return x.mod(this.m);
+        else return x;
+    }
+    function cRevert(x) { return x; }
+    function cReduce(x) { x.divRemTo(this.m,null,x); }
+    function cMulTo(x,y,r) { x.multiplyTo(y,r); this.reduce(r); }
+    function cSqrTo(x,r) { x.squareTo(r); this.reduce(r); }
+
+    Classic.prototype.convert = cConvert;
+    Classic.prototype.revert = cRevert;
+    Classic.prototype.reduce = cReduce;
+    Classic.prototype.mulTo = cMulTo;
+    Classic.prototype.sqrTo = cSqrTo;
+
+    // (protected) return "-1/this % 2^DB"; useful for Mont. reduction
+    // justification:
+    //         xy == 1 (mod m)
+    //         xy =  1+km
+    //   xy(2-xy) = (1+km)(1-km)
+    // x[y(2-xy)] = 1-k^2m^2
+    // x[y(2-xy)] == 1 (mod m^2)
+    // if y is 1/x mod m, then y(2-xy) is 1/x mod m^2
+    // should reduce x and y(2-xy) by m^2 at each step to keep size bounded.
+    // JS multiply "overflows" differently from C/C++, so care is needed here.
+    function bnpInvDigit() {
+        if(this.t < 1) return 0;
+        var x = this[0];
+        if((x&1) == 0) return 0;
+        var y = x&3;		// y == 1/x mod 2^2
+        y = (y*(2-(x&0xf)*y))&0xf;	// y == 1/x mod 2^4
+        y = (y*(2-(x&0xff)*y))&0xff;	// y == 1/x mod 2^8
+        y = (y*(2-(((x&0xffff)*y)&0xffff)))&0xffff;	// y == 1/x mod 2^16
+        // last step - calculate inverse mod DV directly;
+        // assumes 16 < DB <= 32 and assumes ability to handle 48-bit ints
+        y = (y*(2-x*y%this.DV))%this.DV;		// y == 1/x mod 2^dbits
+        // we really want the negative inverse, and -DV < y < DV
+        return (y>0)?this.DV-y:-y;
+    }
+
+    // Montgomery reduction
+    function Montgomery(m) {
+        this.m = m;
+        this.mp = m.invDigit();
+        this.mpl = this.mp&0x7fff;
+        this.mph = this.mp>>15;
+        this.um = (1<<(m.DB-15))-1;
+        this.mt2 = 2*m.t;
+    }
+
+    // xR mod m
+    function montConvert(x) {
+        var r = nbi();
+        x.abs().dlShiftTo(this.m.t,r);
+        r.divRemTo(this.m,null,r);
+        if(x.s < 0 && r.compareTo(BigInteger.ZERO) > 0) this.m.subTo(r,r);
+        return r;
+    }
+
+    // x/R mod m
+    function montRevert(x) {
+        var r = nbi();
+        x.copyTo(r);
+        this.reduce(r);
+        return r;
+    }
+
+    // x = x/R mod m (HAC 14.32)
+    function montReduce(x) {
+        while(x.t <= this.mt2)	// pad x so am has enough room later
+            x[x.t++] = 0;
+        for(var i = 0; i < this.m.t; ++i) {
+            // faster way of calculating u0 = x[i]*mp mod DV
+            var j = x[i]&0x7fff;
+            var u0 = (j*this.mpl+(((j*this.mph+(x[i]>>15)*this.mpl)&this.um)<<15))&x.DM;
+            // use am to combine the multiply-shift-add into one call
+            j = i+this.m.t;
+            x[j] += this.m.am(0,u0,x,i,0,this.m.t);
+            // propagate carry
+            while(x[j] >= x.DV) { x[j] -= x.DV; x[++j]++; }
+        }
+        x.clamp();
+        x.drShiftTo(this.m.t,x);
+        if(x.compareTo(this.m) >= 0) x.subTo(this.m,x);
+    }
+
+    // r = "x^2/R mod m"; x != r
+    function montSqrTo(x,r) { x.squareTo(r); this.reduce(r); }
+
+    // r = "xy/R mod m"; x,y != r
+    function montMulTo(x,y,r) { x.multiplyTo(y,r); this.reduce(r); }
+
+    Montgomery.prototype.convert = montConvert;
+    Montgomery.prototype.revert = montRevert;
+    Montgomery.prototype.reduce = montReduce;
+    Montgomery.prototype.mulTo = montMulTo;
+    Montgomery.prototype.sqrTo = montSqrTo;
+
+    // (protected) true iff this is even
+    function bnpIsEven() { return ((this.t>0)?(this[0]&1):this.s) == 0; }
+
+    // (protected) this^e, e < 2^32, doing sqr and mul with "r" (HAC 14.79)
+    function bnpExp(e,z) {
+        if(e > 0xffffffff || e < 1) return BigInteger.ONE;
+        var r = nbi(), r2 = nbi(), g = z.convert(this), i = nbits(e)-1;
+        g.copyTo(r);
+        while(--i >= 0) {
+            z.sqrTo(r,r2);
+            if((e&(1<<i)) > 0) z.mulTo(r2,g,r);
+            else { var t = r; r = r2; r2 = t; }
+        }
+        return z.revert(r);
+    }
+
+    // (public) this^e % m, 0 <= e < 2^32
+    function bnModPowInt(e,m) {
+        var z;
+        if(e < 256 || m.isEven()) z = new Classic(m); else z = new Montgomery(m);
+        return this.exp(e,z);
+    }
+
+    // protected
+    BigInteger.prototype.copyTo = bnpCopyTo;
+    BigInteger.prototype.fromInt = bnpFromInt;
+    BigInteger.prototype.fromString = bnpFromString;
+    BigInteger.prototype.clamp = bnpClamp;
+    BigInteger.prototype.dlShiftTo = bnpDLShiftTo;
+    BigInteger.prototype.drShiftTo = bnpDRShiftTo;
+    BigInteger.prototype.lShiftTo = bnpLShiftTo;
+    BigInteger.prototype.rShiftTo = bnpRShiftTo;
+    BigInteger.prototype.subTo = bnpSubTo;
+    BigInteger.prototype.multiplyTo = bnpMultiplyTo;
+    BigInteger.prototype.squareTo = bnpSquareTo;
+    BigInteger.prototype.divRemTo = bnpDivRemTo;
+    BigInteger.prototype.invDigit = bnpInvDigit;
+    BigInteger.prototype.isEven = bnpIsEven;
+    BigInteger.prototype.exp = bnpExp;
+
+    // public
+    BigInteger.prototype.toString = bnToString;
+    BigInteger.prototype.negate = bnNegate;
+    BigInteger.prototype.abs = bnAbs;
+    BigInteger.prototype.compareTo = bnCompareTo;
+    BigInteger.prototype.bitLength = bnBitLength;
+    BigInteger.prototype.mod = bnMod;
+    BigInteger.prototype.modPowInt = bnModPowInt;
+
+    // "constants"
+    BigInteger.ZERO = nbv(0);
+    BigInteger.ONE = nbv(1);
+
+    // Export.
+    BigIntegerModule.BigInteger = BigInteger;
+}));
+// </jsbn>
+
+/**
+ * Create user object name space.
+ * @type {{}}
+ */
+eb.comm.createUO = {};
+eb.comm.createUO.consts = {
+    YES: "yes",
+    NO: "no",
+
+    uoType:{
+        HMAC: 0x0001,
+        SCRAMBLE: 0x0002,
+        ENSCRAMBLE: 0x0003,
+        PLAINAES: 0x0004,
+        RSA1024DECRYPT_NOPAD: 0x0005,
+        RSA2048DECRYPT_NOPAD: 0x0006,
+        EC_FP192SIGN: 0x0007,
+        AUTH_HOTP: 0x0008,
+        AUTH_NEW_USER_CTX: 0x0009,
+        AUTH_PASSWORD: 0x000a,
+        AUTH_UPDATE_USER_CTX: 0x000b,
+        TOKENIZE: 0x000c,
+        DETOKENIZE: 0x000d,
+        TOKENIZEWRAP: 0x000e,
+        PLAINAESDECRYPT: 0x000f,
+        RANDOMDATA: 0x0010,
+        CREATENEWUO: 0x0011,
+        RSA1024ENCRYPT_NOPAD: 0x0012,
+        RSA2048ENCRYPT_NOPAD: 0x0013
+    },
+
+    environment:{
+        DEV: "dev",
+        TEST: "test",
+        PROD: "prod"
+    },
+
+    maxtps: {
+        _1: "one",
+        _10: "ten",
+        _20: "twenty",
+        _50: "fifty",
+        _100: "one_hundred",
+        _200: "two_hundred",
+        _500: "five_hundred",
+        _1000: "one_thousand",
+        _2000: "two_thousand",
+        _5000: "five_thousand",
+        _10000: "ten_thousand",
+        _50000: "fifty_thousand",
+        _100000: "hundred_thousand",
+        UNLIMITED: "unlimited"
+    },
+
+    core: {
+        EMPTY: "empty",
+        _1: "one",
+        _2: "two",
+        _3: "three",
+        _5: "five",
+        _10: "ten",
+        _20: "twenty",
+        CLUSTER: "cluster"
+    },
+
+    persistence: {
+        _1min: "one_minute",
+        _2min: "two_minutes",
+        _5min: "five_minutes",
+        _15min: "fifteen_minutes",
+        _30min: "thirty_minutes",
+        _1h: "one_hour",
+        _2h: "two_hours",
+        _6h: "six_hours",
+        _12h: "twelve_hours",
+        _1d: "one_day",
+        _2d: "two_days",
+        _7d: "seven_days",
+        _14d: "forteen_days",
+        _28d: "twentyeight_days",
+        _1mon: "one_month"
+    },
+
+    priority: {
+        LOW: "low",
+        DEFAULT: "default",
+        HIGH: "high",
+        MAX: "maximum"
+    },
+
+    separation: {
+        TIME: "time",
+        COMPLETE: "complete"
+    },
+
+    resource: {
+        GLOBAL: "global",
+        INSTANCE: "instance",
+        CLUSTER: "cluster",
+        CARD: "card"
+    },
+
+    genKey: {
+        LOCAL: 0,
+        SERVER: 1,
+        COMP1: 2,
+        COMP2: 3,
+        COMP3: 4
+    }
+};
+
+/**
+ * getUOTemplate response.
+ * @extends eb.comm.response
+ */
+eb.comm.createUO.UOTemplateResponse = function(x){
+    eb.misc.absorb(this, x);
+};
+eb.comm.createUO.UOTemplateResponse.inheritsFrom(eb.comm.response, {
+    /**
+     * Response fields
+     */
+    uot: {
+        "objectid": undefined,
+        "version": undefined, //<integer>,
+        "protocol": undefined, //<integer>,
+        "encryptionoffset": undefined, //<decimal_number>,
+        "flagoffset": undefined, //<decimal_number>,
+        "policyoffset": undefined, //<decimal_number>,
+        "scriptoffset": undefined, //<decimal_number,
+        "keyoffsets": [
+            //{"type": "commk",  offset: 180, length: 20,  "tlvtype":1},
+            //{"type": "comenc",  offset: 200, length: 10,  "tlvtype":1},
+            //{"type": "commac",  offset: 210, length: 10,  "tlvtype":2},
+            //{"type": "billing", offset: 220, length: 10,  "tlvtype":3},
+            //{"type": "comnextenc", offset: 230, length: 10,  "tlvtype":4},
+            //{"type": "conextmac", offset: 240, length: 10,  "tlvtype":5},
+            //{"type": "app",    offset: 250, length: 200, "tlvtype":6}
+        ],
+        "template": undefined, // hexcoded
+        "templatehs": undefined, // hexcoded
+        "importkeys": [
+            //{"id": <string>, "type":<"rsa2048"|"rsa1024">, "publickey": <string-serialized public key> },
+        ],
+        "authorization": undefined //<string>
+    }
+});
+
+/**
+ * Create new UO requests
+ */
+eb.comm.createUO.getUOTemplateRequest = function(){
+    this.callFunction = "GetUserObjectTemplate";
+};
+eb.comm.createUO.getUOTemplateRequest.inheritsFrom(eb.comm.apiRequest, {
+    objName: "getUOTemplateRequest",
+
+    /**
+     * Default request values.
+     * @const
+     */
+    defaults: {
+        "format": 1,        //<integer, starting with 1>,
+        "protocol": 1,      //<integer, starting with 1>,
+        "type": eb.comm.createUO.consts.uoType.PLAINAES,        //<32bit integer>,
+        "environment": eb.comm.createUO.consts.environment.DEV, // shows whether the UO should be for production (live), test (pre-production testing), or dev (development)
+        "maxtps": eb.comm.createUO.consts.maxtps.UNLIMITED, // maximum guaranteed TPS
+        "core": eb.comm.createUO.consts.core.EMPTY, // how many cards have UO loaded permanently
+        "persistence": eb.comm.createUO.consts.persistence._1min, // once loaded onto card, how long will the UO stay there without use (this excludes the "core")
+        "priority": eb.comm.createUO.consts.priority.DEFAULT, // this defines a) priority when the server capacity is fully utilised and it also defines how quickly new copies of UO are installed (pre-empting icreasing demand)
+        "separation": eb.comm.createUO.consts.separation.TIME, // "complete" = only one UO can be loaded on a smartcard at one one time
+        "bcr": eb.comm.createUO.consts.YES,      // "yes" will ensure the UO is replicated to provide high availability for any possible service disruption
+        "unlimited": eb.comm.createUO.consts.YES,
+        "clientiv": eb.comm.createUO.consts.YES, //  if "yes", we expect the data starts with an IV to initialize decryption of data - this is for communication security
+        "clientdiv": eb.comm.createUO.consts.NO, // if "yes", we expect the data starting with a diversification 16B for communication keys
+        "resource": eb.comm.createUO.consts.resource.GLOBAL,
+        "credit": 256, // <1-32767>, a limit a seed card can provide to the EB service
+        "generation": {
+            "commkey": eb.comm.createUO.consts.genKey.SERVER,
+            "billingkey": eb.comm.createUO.consts.genKey.SERVER,
+            "appkey": eb.comm.createUO.consts.genKey.SERVER
+        }
+    },
+
+    /**
+     * Process configuration from the config object.
+     * @param configObject java object with the configuration.
+     */
+    configure: function(configObject){
+        if (!configObject){
+            this._log("Invalid config object");
+            return;
+        }
+
+        var toConfig = configObject;
+        if ("userObjectId" in configObject){
+            toConfig = $.extend(true, toConfig, {apiKeyLow4Bytes : configObject.userObjectId});
+        }
+
+        // Configure with parent.
+        eb.comm.createUO.getUOTemplateRequest.superclass.configure.call(this, toConfig);
+    },
+
+    /**
+     * Initializes state and builds request
+     * @param {object} request
+     */
+    build: function(request){
+        this._log("Building request body");
+
+        // Request header data.
+        this.buildApiBlock(this.apiKey, this.userObjectId);
+        this.buildReqHeader();
+        this.reqBody = {data:this.defaults};
+        this.reqBody.data = $.extend(true, this.reqBody.data, request || {});
+
+        var nonce = this.getNonce();
+        var url = this.getApiUrl();
+        this._log("Nonce generated: " + nonce);
+        this._log("URL: " + url + ", method: " + this.requestMethod);
+        this._log("SocketReq: " + JSON.stringify(this.getSocketRequest()));
+        this._log("Data: " + JSON.stringify(this.reqBody));
+    },
+
+    /**
+     * Returns response parser when is needed. May lazily initialize parser.
+     * Override point.
+     *
+     * @returns {*}
+     */
+    getResponseParser: function(){
+        // Generic parser with given parsing function.
+        var parser = new eb.comm.responseParser();
+        parser.parsingFunction(function(data, resp, parser){
+            var response = new eb.comm.createUO.UOTemplateResponse(resp);
+            if (!data.data ) {
+                parser._log("Invalid response");
+                throw new eb.exception.invalid("Invalid response");
+            }
+
+            response.uot = data.data;
+            return response;
+        });
+
+        this.responseParser = parser;
+        return this.responseParser;
+    }
+});
+
+eb.comm.asn1decoder = function(options){
+    this.logger = options.logger;
+};
+eb.comm.asn1decoder.prototype = {
+    llog: function(lvl, msg){
+        if (this.logger){
+            this.logger("|" + ("--".repeat(lvl)) + msg);
+        }
+    },
+    parse: function(buffer, lvl) {
+        var w = sjcl.bitArray;
+        var result = {};
+        var position = 0;
+        this.llog(lvl, "Parsing: " + sjcl.codec.hex.fromBits(buffer));
+
+        result.cls = getClass();
+        result.structured = getStructured();
+        result.tag = getTag();
+        var length = getLength(); // As encoded, which may be special value 0
+
+        if (length === 0x80) {
+            length = 0;
+            while (getByte(position + length) !== 0 || getByte(position + length + 1) !== 0) {
+                length += 1;
+            }
+            result.byteLength = position + length + 2;
+            result.contents = w.bitSlice(buffer, 8*position, 8*(position + length));
+        } else {
+            result.byteLength = position + length;
+            result.contents = w.bitSlice(buffer, 8*position, 8*(result.byteLength));
+        }
+
+        var doProcess = result.structured;
+
+        // BIT-STRING?
+        if (result.cls == 0 && result.tag == 3){
+            doProcess = true;
+            var unusedBits = w.extract(buffer, 8*position, 8);
+            result.contents = w.bitSlice(buffer, 8*(position+1), 8*(result.byteLength)-unusedBits);
+        }
+
+        result.clen = w.bitLength(result.contents)/8;
+        result.sub = [];
+        this.llog(lvl, sprintf("Cur: tag: %02d, cls: %02d, struct: %d, len: %04d", result.tag, result.cls, result.structured, result.clen));
+
+        if (doProcess){
+            var subElem = undefined, subContent = result.contents, idx=0;
+            do {
+                this.llog(lvl, "Parsing sub: " + idx);
+                subElem = this.parse(subContent, lvl === undefined ? 1 : lvl+1);
+                if (subElem) {
+                    result.sub.push(subElem);
+                } else {
+                    break;
+                }
+
+                if (subElem.byteLength !== undefined) {
+                    subContent = w.bitSlice(subContent, 8*subElem.byteLength);
+                    this.llog(lvl, "Bytes left: " + (w.bitLength(subContent)/8));
+                }
+                idx += 1;
+            } while(subElem && w.bitLength(subContent) > 0);
+        }
+
+        return result;
+
+        // Function for recursive calls - keeps context.
+        function getByte(offset){
+            return w.extract(buffer, offset * 8, 8);
+        }
+
+        function getClass() {
+            return (getByte(position) & 0xc0) / 64;
+        }
+
+        function getStructured() {
+            return ((getByte(position)) & 0x20) === 0x20;
+        }
+
+        function getTag() {
+            var tag = getByte(0) & 0x1f;
+            position += 1;
+            if (tag === 0x1f) {
+                tag = 0;
+                while (getByte[position] >= 0x80) {
+                    tag = tag * 128 + getByte(position) - 0x80;
+                    position += 1;
+                }
+                tag = tag * 128 + getByte(position) - 0x80;
+                position += 1;
+            }
+            return tag;
+        }
+
+        function getLength() {
+            var length = 0;
+
+            if (getByte(position) < 0x80) {
+                length = getByte(position);
+                position += 1;
+            } else {
+                var numberOfDigits = getByte(position) & 0x7f;
+                position += 1;
+                length = 0;
+                for (var i = 0; i < numberOfDigits; i++) {
+                    length = length * 256 + getByte(position);
+                    position += 1;
+                }
+            }
+            return length;
+        }
+    }
+};
+
+/**
+ * Template filler
+ *
+ * @param {object} options
+ * @param {object} options.template
+ * @param {boolean} options.debuggingLog
+ * @param {Function} options.logger
+ */
+eb.comm.createUO.templateFiller = function(options){
+    options = options || {};
+    this.template = options.template;
+    this.debuggingLog = options.debuggingLog || true;
+    this.logger = options.logger;
+};
+eb.comm.createUO.templateFiller.prototype = {
+    /**
+     * Builds template to import.
+     * keys:
+     *  commk: {key: bits}
+     *  app: {key: bits}
+     */
+    build: function(options){
+        options = options || {};
+        var template = options.template || this.template;
+        var keys = options.keys || {};
+
+        // Vars.
+        var h = sjcl.codec.hex, w = sjcl.bitArray, i, ln, cKeyOff, cKey, cKeyVal, baOrig;
+        var baPlain, baProtected;
+
+        // Message shortcuts.
+        var encOffset = template.encryptionoffset;
+        var keysOffset = template.keyoffsets || [];
+        var importKeys = template.importkeys || [];
+
+        // Raw template to fill-in.
+        var ba = eb.misc.inputToBits(template.template);
+
+        // Fill in template keys?
+        for(i = 0, ln = keysOffset.length; i < ln; ++i){
+            cKeyOff = keysOffset[i];
+            if (!cKeyOff || !cKeyOff.type || !(cKeyOff.type in keys)){
+                this._log("Key not found: " + cKeyOff.type);
+                continue;
+            }
+
+            cKey = keys[cKeyOff.type];
+            cKeyVal = eb.misc.inputToBits(cKey.key);
+            if (w.bitLength(cKeyVal) != cKeyOff.length){
+                this._log("Key bitLength does not match: " + w.bitLength(cKeyVal) + " vs " + cKeyOff.length);
+                continue;
+            }
+
+            // before + key + after
+            baOrig = ba;
+            ba = w.concat(w.bitSlice(baOrig, 0, cKeyOff.offset), cKeyVal); // before + key
+            ba = w.concat(ba, w.bitSlice(baOrig, cKeyOff.offset + cKeyOff.length)); // after
+        }
+
+        // Encrypt template from encOffset.
+        baPlain = w.bitSlice(ba, 0, encOffset);
+        baProtected = w.bitSlice(ba, encOffset);
+
+        var tek, tmk;
+        tek = sjcl.random.randomWords(8);
+        tmk = sjcl.random.randomWords(8);
+        baProtected = eb.padding.pkcs7.pad(baProtected);
+        this._log('Padded plain template: ' + h.fromBits(baProtected) + ", len=" + w.bitLength(baProtected));
+
+        // Symmetric Encryption
+        var aes = new sjcl.cipher.aes(tek);
+        var hmac = new sjcl.misc.hmac_cbc(new sjcl.cipher.aes(tmk), 16, eb.padding.empty);
+        var IV = [0, 0, 0, 0];
+        baProtected = sjcl.mode.cbc.encrypt(aes, baProtected, IV, [], true);
+        this._log('Encrypted template: ' + h.fromBits(baProtected) + ", len=" + w.bitLength(baProtected));
+
+        // baPlain | baProtected | MAC(baPlain | baProtected)
+        ba = w.concat(baPlain, baProtected);
+        ba = eb.padding.pkcs7.pad(ba);
+        ba = w.concat(ba, hmac.mac(ba));
+
+        // RSA encryption: UOID-4B | TEK | TMK
+        var iKey = this._getBestImportKey(importKeys);
+        var baRsaEnc = [];
+        baRsaEnc = w.concat(baRsaEnc, [parseInt(template.objectid, 16)]);
+        baRsaEnc = w.concat(baRsaEnc, tek);
+        baRsaEnc = w.concat(baRsaEnc, tmk);
+        this._log('To wrap: ' + h.fromBits(baRsaEnc) + ", len=" + w.bitLength(baRsaEnc));
+        var wrapped = this._rsaEncrypt(baRsaEnc, iKey);
+
+        // Final template: 0xa1 | len-2B | RSA-ENC-BLOB | 0xa2 | len-2B | encrypted-maced-template
+        var finalTpl = [w.partial(8, 0xa1)];
+        finalTpl = w.concat(finalTpl, [w.partial(16, w.bitLength(wrapped)/8)]);
+        finalTpl = w.concat(finalTpl, wrapped);
+
+        finalTpl = w.concat(finalTpl, [w.partial(8, 0xa2)]);
+        finalTpl = w.concat(finalTpl, [w.partial(16, w.bitLength(ba)/8)]);
+        finalTpl = w.concat(finalTpl, ba);
+
+        // Return encrypted template.
+        return {uo:finalTpl, keyUsed:iKey};
+    },
+
+    _rsaEncrypt: function(input, key){
+        var iKeyBl = key.type == 'rsa2048' ? 2048 : 1024;
+        var data = eb.padding.pkcs15.pad(input, iKeyBl/8, 2);
+        this._log('To wrap padded: ' + sjcl.codec.hex.fromBits(data) + ", len=" + sjcl.bitArray.bitLength(data));
+
+        // Deserialize public key, convert to integers, result = (message ^ exponent) mod modulus
+        var pubKey = this._readSerializedPubKey(key.key);
+
+        var msg = new eb.math.BigInteger(sjcl.codec.hex.fromBits(data), 16);
+        var mod = new eb.math.BigInteger(sjcl.codec.hex.fromBits(pubKey.n), 16);
+        var exp = parseInt(sjcl.codec.hex.fromBits(pubKey.e), 16);
+        var res = msg.modPowInt(exp, mod);
+        return sjcl.codec.hex.toBits(res.toString(16));
+
+        // SJCL BN is terribly slow!!!
+        //var msg = sjcl.bn.fromBits(data);
+        //var mod = sjcl.bn.fromBits(pubKey.n);
+        //var exp = sjcl.bn.fromBits(pubKey.e);
+        //
+        // Encryption.
+        //msg.powermod(exp, mod);
+        //return msg.toBits();
+    },
+
+    _readSerializedPubKey: function(pubKey){
+        // ASN1:
+        //PublicKeyInfo ::= SEQUENCE {
+        //    algorithm       AlgorithmIdentifier,
+        //    PublicKey       BIT STRING
+        //}
+        //AlgorithmIdentifier ::= SEQUENCE {
+        //    algorithm       OBJECT IDENTIFIER,
+        //    parameters      ANY DEFINED BY algorithm OPTIONAL
+        //}
+        //RSAPublicKey ::= SEQUENCE {
+        //    modulus           INTEGER,  -- n
+        //    publicExponent    INTEGER   -- e
+        //}
+        //
+        // We encode it differently...
+        // TAG|len-2B|value. 81 = exponent, 82 = modulus
+        var w = sjcl.bitArray;
+        var ba = eb.misc.inputToBits(pubKey);
+        var result = {};
+
+        var tag, len, pos = 0, dat, ln = w.bitLength(ba)/8;
+        for(;pos < ln;){
+            tag = w.extract(ba, 8*pos, 8); pos+=1;
+            len = w.extract(ba, 8*pos, 16); pos+=2;
+            dat = w.bitSlice(ba, 8*pos, 8*(pos+len)); pos+=len;
+            switch(tag){
+                case 0x81:
+                    result.e = dat;
+                    break;
+                case 0x82:
+                    result.n = dat;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (result.n === undefined || result.e === undefined){
+            throw new eb.exception.invalid("Invalid public key");
+        }
+
+        return result;
+    },
+
+    _getBestImportKey: function(importKeys){
+        var i, ln, cKey;
+        importKeys = importKeys || [];
+
+        // Search RSA2048.
+        var kRsa2048 = undefined;
+        var kRsa1024 = undefined;
+        for(i=0, ln=importKeys.length; i<ln; i++){
+            cKey = importKeys[i];
+            if (kRsa1024 === undefined && cKey.type == "rsa1024"){
+                kRsa1024 = cKey;
+            }
+            if (kRsa2048 === undefined && cKey.type == "rsa2048"){
+                kRsa2048 = cKey;
+            }
+        }
+
+        return (kRsa2048 === undefined) ? kRsa1024 : kRsa2048;
+    },
+
+    _log:  function(x) {
+        if (!this.debuggingLog){
+            return;
+        }
+
+        if (this.logger){
+            this.logger(x);
+        } else if (console && console.log){
+            console.log(x);
+        }
+    }
+};
+
+/**
+ * getUOTemplate response.
+ * @extends eb.comm.response
+ */
+eb.comm.createUO.importUOResponse = function(x){
+    eb.misc.absorb(this, x);
+};
+eb.comm.createUO.importUOResponse.inheritsFrom(eb.comm.response, {
+    /**
+     * Response fields
+     */
+    uoi: {
+        "uoid": undefined
+    }
+});
+
+/**
+ * Import UO request
+ * @extends eb.comm.apiRequest
+ */
+eb.comm.createUO.importUORequest = function(){
+    this.callFunction = "CreateUserObject";
+};
+eb.comm.createUO.importUORequest.inheritsFrom(eb.comm.apiRequest, {
+    objName: "CreateUserObject",
+
+    /**
+     * Default request values.
+     * @const
+     */
+    defaults: {
+        "objectid": undefined,       // 0x10
+        "object": undefined,       // '0011223344556677'
+        "authorization": ""
+    },
+
+    /**
+     * Process configuration from the config object.
+     * @param configObject java object with the configuration.
+     */
+    configure: function(configObject){
+        if (!configObject){
+            this._log("Invalid config object");
+            return;
+        }
+
+        var toConfig = configObject;
+        if ("userObjectId" in configObject){
+            toConfig = $.extend(true, toConfig, {apiKeyLow4Bytes : configObject.userObjectId});
+        }
+
+        // Configure with parent.
+        eb.comm.createUO.importUORequest.superclass.configure.call(this, toConfig);
+    },
+
+    /**
+     * Initializes state and builds request
+     * @param {object} request
+     */
+    build: function(request){
+        this._log("Building request body");
+
+        // Request header data.
+        this.buildApiBlock(this.apiKey, this.userObjectId);
+        this.buildReqHeader();
+        this.reqBody = {data:this.defaults};
+        this.reqBody.data = $.extend(true, this.reqBody.data, request || {});
+
+        var nonce = this.getNonce();
+        var url = this.getApiUrl();
+        this._log("Nonce generated: " + nonce);
+        this._log("URL: " + url + ", method: " + this.requestMethod);
+        this._log("SocketReq: " + JSON.stringify(this.getSocketRequest()));
+        this._log("Data: " + JSON.stringify(this.reqBody));
+    },
+
+    /**
+     * Returns response parser when is needed. May lazily initialize parser.
+     * Override point.
+     *
+     * @returns {*}
+     */
+    getResponseParser: function(){
+        // Generic parser with given parsing function.
+        var parser = new eb.comm.responseParser();
+        parser.parsingFunction(function(data, resp, parser){
+            var response = new eb.comm.createUO.importUOResponse(resp);
+            if (!data.data ) {
+                parser._log("Invalid response");
+                throw new eb.exception.invalid("Invalid response");
+            }
+
+            response.uoi = data.data;
+            return response;
+        });
+
+        this.responseParser = parser;
+        return this.responseParser;
     }
 });
 
