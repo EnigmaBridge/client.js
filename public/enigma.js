@@ -507,6 +507,14 @@ eb.misc = {
     },
 
     /**
+     * Function generates random bit vector of given length.
+     * @param bitLength
+     */
+    getRandomBits: function(bitLength){
+        return sjcl.bitArray.clamp(sjcl.random.randomWords(Math.ceil(bitLength/32)), bitLength);
+    },
+
+    /**
      * Converts given number to the bitArray representation.
      *
      * @param num
