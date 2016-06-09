@@ -323,24 +323,25 @@ sjcl.codec.base32hex = {
  */
 var eb = {
     name: "EB",
-    /** @namespace Exceptions. */
-    exception: {
-        /** @constructor Ciphertext is corrupt. */
-        corrupt: function (message) {
-            this.toString = function () {
-                return "CORRUPT: " + this.message;
-            };
-            this.message = message;
-        },
-        /** @constructor Invalid input. */
-        invalid: function (message) {
-            this.toString = function () {
-                return "INVALID: " + this.message;
-            };
-            this.message = message;
-        },
-    }
 };
+
+/** @namespace Exceptions. */
+eb.exception = {
+    /** @constructor Ciphertext is corrupt. */
+    corrupt: function (message) {
+        this.toString = function () {
+            return "CORRUPT: " + this.message;
+        };
+        this.message = message;
+    },
+    /** @constructor Invalid input. */
+    invalid: function (message) {
+        this.toString = function () {
+            return "INVALID: " + this.message;
+        };
+        this.message = message;
+    },
+}
 
 /**
  * EB misc wrapper.
