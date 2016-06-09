@@ -1450,8 +1450,8 @@ eb.comm.processDataRequestBodyBuilder.prototype = {
         baBuff = pad.pad(baBuff);
         this._log('ProcessData function input PDIN (0x1f | <UOID-4B> | <nonce-8B> | data | pkcs#7padding) : ' + h.fromBits(baBuff) + "; len: " + ba.bitLength(baBuff));
 
-        var aesKeyBits = h.toBits(this.aesKey);
-        var macKeyBits = h.toBits(this.macKey);
+        var aesKeyBits = eb.misc.inputToBits(this.aesKey);
+        var macKeyBits = eb.misc.inputToBits(this.macKey);
 
         var aes = new sjcl.cipher.aes(aesKeyBits);
         var aesMac = new sjcl.cipher.aes(macKeyBits);
@@ -1840,8 +1840,8 @@ eb.comm.processDataResponseParser.inheritsFrom(eb.comm.responseParser, {
         var protectedBitsBl = ba.bitLength(protectedBits);
 
         // Decrypt and verify
-        var aesKeyBits = h.toBits(this.aesKey);
-        var macKeyBits = h.toBits(this.macKey);
+        var aesKeyBits = eb.misc.inputToBits(this.aesKey);
+        var macKeyBits = eb.misc.inputToBits(this.macKey);
         var aes = new sjcl.cipher.aes(aesKeyBits);
         var aesMac = new sjcl.cipher.aes(macKeyBits);
         var hmac = new sjcl.misc.hmac_cbc(aesMac, 16, eb.padding.empty);
