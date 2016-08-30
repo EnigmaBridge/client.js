@@ -1047,10 +1047,10 @@ eb.padding.pkcs15 = {
             ps.push(sjcl.bitArray.partial(8*(i&3), tmp));
         }
 
-        var baBuff = h.toBits("00");
-        baBuff = w.concat(baBuff, h.toBits(sprintf("%02x", bt)));
+        var baBuff = [sjcl.bitArray.partial(8,0)];
+        baBuff = w.concat(baBuff, [sjcl.bitArray.partial(8,bt)]);
         baBuff = w.concat(baBuff, ps);
-        baBuff = w.concat(baBuff, h.toBits("00"));
+        baBuff = w.concat(baBuff, [sjcl.bitArray.partial(8,0)]);
         return w.concat(baBuff, a);
     },
     unpad: function(a){
@@ -1473,7 +1473,7 @@ eb.comm.processDataRequestBodyBuilder.prototype = {
         var plainDataLength = ba.bitLength(baPlain)/8;
 
         // Input data flag
-        var baBuff = h.toBits("1f");
+        var baBuff = [ba.partial(8, 0x1f)];
         // User Object ID
         baBuff = ba.concat(baBuff, h.toBits(sprintf("%08x", eb.misc.inputToHexNum(this.userObjectId))));
         // Freshness nonce
@@ -2992,7 +2992,7 @@ eb.comm.hotp = {
     userIdToBits: function(x){
         var ln;
         if (typeof(x) === 'number'){
-            return eb.comm.hotp.userIdBitsNormalize(sjcl.codec.hex.toBits(sprintf("%x", x)));
+            return eb.comm.hotp.userIdBitsNormalize([x]);
 
         } else if (typeof(x) === 'string') {
             x = x.trim();
@@ -3435,12 +3435,12 @@ eb.comm.hotp.newHotpUserRequestBuilder.inheritsFrom(eb.comm.base, {
         var userAuthCtxUserIDBits = hex.toBits(userAuthCtxUserID);
         var userAuthCtxBits = ba.concat(userAuthCtxUserIDBits, tpl);
 
-        var request = hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT));
-        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(userAuthCtxPrepared)/8)));
+        var request = [ba.partial(8, eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT)];
+        request = ba.concat(request, [ba.partial(16, ba.bitLength(userAuthCtxPrepared)/8)]);
         request = ba.concat(request, userAuthCtxPrepared);
 
-        request = ba.concat(request, hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_NEWAUTHCONTEXT)));
-        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(userAuthCtxBits)/8)));
+        request = ba.concat(request, [ba.partial(8, eb.comm.hotp.TLV_TYPE_NEWAUTHCONTEXT)]);
+        request = ba.concat(request, [ba.partial(16, ba.bitLength(userAuthCtxBits)/8)]);
         request = ba.concat(request, userAuthCtxBits);
 
         return request;
@@ -3496,12 +3496,12 @@ eb.comm.hotp.hotpUserAuthRequestBuilder.inheritsFrom(eb.comm.base, {
         var verificationCodeBits = hex.toBits(verificationCode);
         var userCtxBits = eb.misc.inputToBits(userCtx);
 
-        var request = hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT));
-        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(userCtxBits)/8)));
+        var request = [ba.partial(8, eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT)];
+        request = ba.concat(request, [ba.partial(16, ba.bitLength(userCtxBits)/8)]);
         request = ba.concat(request, userCtxBits);
 
-        request = ba.concat(request, hex.toBits(sprintf("%02x", tlvOp)));
-        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(verificationCodeBits)/8)));
+        request = ba.concat(request, [ba.partial(8, tlvOp)]);
+        request = ba.concat(request, [ba.partial(16, ba.bitLength(verificationCodeBits)/8)]);
         request = ba.concat(request, verificationCodeBits);
 
         return request;
@@ -3576,12 +3576,12 @@ eb.comm.hotp.updateAuthContextRequestBuilder.inheritsFrom(eb.comm.base, {
 
         // Request itself.
         var request = [];
-        request = ba.concat(request, hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT)));
-        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(userCtxBits)/8)));
+        request = ba.concat(request, [ba.partial(8,  eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT)]);
+        request = ba.concat(request, [ba.partial(16, ba.bitLength(userCtxBits)/8)]);
         request = ba.concat(request, userCtxBits);
 
-        request = ba.concat(request, hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_UPDATEAUTHCONTEXT)));
-        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(updateCtx)/8)));
+        request = ba.concat(request, [ba.partial(8,  eb.comm.hotp.TLV_TYPE_UPDATEAUTHCONTEXT)]);
+        request = ba.concat(request, [ba.partial(16, ba.bitLength(updateCtx)/8)]);
         request = ba.concat(request, updateCtx);
 
         return request;
