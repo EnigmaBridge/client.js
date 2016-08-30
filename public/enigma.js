@@ -531,6 +531,40 @@ eb.misc = {
     },
 
     /**
+     * Replaces part in the given buffer with the provided replacement
+     *
+     * @param {bitArray|Array} buffer
+     * @param {Number} offsetStartBit
+     * @param {Number} offsetEndBit
+     * @param {bitArray|Array} replacement
+     */
+    replacePart: function(buffer, offsetStartBit, offsetEndBit, replacement){
+        var w = sjcl.bitArray;
+        var ba = w.concat(w.bitSlice(buffer, 0, offsetStartBit), replacement); // before + transform
+        ba = w.concat(ba, w.bitSlice(buffer, offsetEndBit)); // after
+
+        return ba;
+    },
+
+    /**
+     * Function transforms given slice of the array by the function provided and replaces
+     * original portion with the result of function call.
+     *
+     * @param {bitArray|Array} buffer
+     * @param {Number} offsetStartBit
+     * @param {Number} offsetEndBit
+     * @param {Function} fction
+     */
+    transformPart: function(buffer, offsetStartBit, offsetEndBit, fction){
+        var w = sjcl.bitArray;
+        var slice = w.bitSlice(buffer, offsetStartBit, offsetEndBit);
+        var ba = w.concat(w.bitSlice(buffer, 0, offsetStartBit), fction(slice)); // before + transform
+        ba = w.concat(ba, w.bitSlice(buffer, offsetEndBit)); // after
+
+        return ba;
+    },
+
+    /**
      * Serializes 64bit number to a bitArray.
      * @param {Number} num
      * @returns {bitArray|Array}
