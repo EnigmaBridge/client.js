@@ -322,7 +322,7 @@ sjcl.codec.base32hex = {
  * @type {{name: string}}
  */
 var eb = {
-    name: "EB",
+    name: "EB"
 };
 
 /** @namespace Exceptions. */
@@ -340,8 +340,8 @@ eb.exception = {
             return "INVALID: " + this.message;
         };
         this.message = message;
-    },
-}
+    }
+};
 
 /**
  * EB misc wrapper.
@@ -528,6 +528,40 @@ eb.misc = {
             return [num];
         }
         return sjcl.bitArray.bitSlice([num], 32-bitSize, 32);
+    },
+
+    /**
+     * Replaces part in the given buffer with the provided replacement
+     *
+     * @param {bitArray|Array} buffer
+     * @param {Number} offsetStartBit
+     * @param {Number} offsetEndBit
+     * @param {bitArray|Array} replacement
+     */
+    replacePart: function(buffer, offsetStartBit, offsetEndBit, replacement){
+        var w = sjcl.bitArray;
+        var ba = w.concat(w.bitSlice(buffer, 0, offsetStartBit), replacement); // before + transform
+        ba = w.concat(ba, w.bitSlice(buffer, offsetEndBit)); // after
+
+        return ba;
+    },
+
+    /**
+     * Function transforms given slice of the array by the function provided and replaces
+     * original portion with the result of function call.
+     *
+     * @param {bitArray|Array} buffer
+     * @param {Number} offsetStartBit
+     * @param {Number} offsetEndBit
+     * @param {Function} fction
+     */
+    transformPart: function(buffer, offsetStartBit, offsetEndBit, fction){
+        var w = sjcl.bitArray;
+        var slice = w.bitSlice(buffer, offsetStartBit, offsetEndBit);
+        var ba = w.concat(w.bitSlice(buffer, 0, offsetStartBit), fction(slice)); // before + transform
+        ba = w.concat(ba, w.bitSlice(buffer, offsetEndBit)); // after
+
+        return ba;
     },
 
     /**
@@ -1013,10 +1047,10 @@ eb.padding.pkcs15 = {
             ps.push(sjcl.bitArray.partial(8*(i&3), tmp));
         }
 
-        var baBuff = h.toBits("00");
-        baBuff = w.concat(baBuff, h.toBits(sprintf("%02x", bt)));
+        var baBuff = [sjcl.bitArray.partial(8,0)];
+        baBuff = w.concat(baBuff, [sjcl.bitArray.partial(8,bt)]);
         baBuff = w.concat(baBuff, ps);
-        baBuff = w.concat(baBuff, h.toBits("00"));
+        baBuff = w.concat(baBuff, [sjcl.bitArray.partial(8,0)]);
         return w.concat(baBuff, a);
     },
     unpad: function(a){
@@ -1439,7 +1473,7 @@ eb.comm.processDataRequestBodyBuilder.prototype = {
         var plainDataLength = ba.bitLength(baPlain)/8;
 
         // Input data flag
-        var baBuff = h.toBits("1f");
+        var baBuff = [ba.partial(8, 0x1f)];
         // User Object ID
         baBuff = ba.concat(baBuff, h.toBits(sprintf("%08x", eb.misc.inputToHexNum(this.userObjectId))));
         // Freshness nonce
@@ -2958,7 +2992,7 @@ eb.comm.hotp = {
     userIdToBits: function(x){
         var ln;
         if (typeof(x) === 'number'){
-            return eb.comm.hotp.userIdBitsNormalize(sjcl.codec.hex.toBits(sprintf("%x", x)));
+            return eb.comm.hotp.userIdBitsNormalize([x]);
 
         } else if (typeof(x) === 'string') {
             x = x.trim();
@@ -3401,12 +3435,12 @@ eb.comm.hotp.newHotpUserRequestBuilder.inheritsFrom(eb.comm.base, {
         var userAuthCtxUserIDBits = hex.toBits(userAuthCtxUserID);
         var userAuthCtxBits = ba.concat(userAuthCtxUserIDBits, tpl);
 
-        var request = hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT));
-        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(userAuthCtxPrepared)/8)));
+        var request = [ba.partial(8, eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT)];
+        request = ba.concat(request, [ba.partial(16, ba.bitLength(userAuthCtxPrepared)/8)]);
         request = ba.concat(request, userAuthCtxPrepared);
 
-        request = ba.concat(request, hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_NEWAUTHCONTEXT)));
-        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(userAuthCtxBits)/8)));
+        request = ba.concat(request, [ba.partial(8, eb.comm.hotp.TLV_TYPE_NEWAUTHCONTEXT)]);
+        request = ba.concat(request, [ba.partial(16, ba.bitLength(userAuthCtxBits)/8)]);
         request = ba.concat(request, userAuthCtxBits);
 
         return request;
@@ -3462,12 +3496,12 @@ eb.comm.hotp.hotpUserAuthRequestBuilder.inheritsFrom(eb.comm.base, {
         var verificationCodeBits = hex.toBits(verificationCode);
         var userCtxBits = eb.misc.inputToBits(userCtx);
 
-        var request = hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT));
-        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(userCtxBits)/8)));
+        var request = [ba.partial(8, eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT)];
+        request = ba.concat(request, [ba.partial(16, ba.bitLength(userCtxBits)/8)]);
         request = ba.concat(request, userCtxBits);
 
-        request = ba.concat(request, hex.toBits(sprintf("%02x", tlvOp)));
-        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(verificationCodeBits)/8)));
+        request = ba.concat(request, [ba.partial(8, tlvOp)]);
+        request = ba.concat(request, [ba.partial(16, ba.bitLength(verificationCodeBits)/8)]);
         request = ba.concat(request, verificationCodeBits);
 
         return request;
@@ -3542,12 +3576,12 @@ eb.comm.hotp.updateAuthContextRequestBuilder.inheritsFrom(eb.comm.base, {
 
         // Request itself.
         var request = [];
-        request = ba.concat(request, hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT)));
-        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(userCtxBits)/8)));
+        request = ba.concat(request, [ba.partial(8,  eb.comm.hotp.TLV_TYPE_USERAUTHCONTEXT)]);
+        request = ba.concat(request, [ba.partial(16, ba.bitLength(userCtxBits)/8)]);
         request = ba.concat(request, userCtxBits);
 
-        request = ba.concat(request, hex.toBits(sprintf("%02x", eb.comm.hotp.TLV_TYPE_UPDATEAUTHCONTEXT)));
-        request = ba.concat(request, hex.toBits(sprintf("%04x", ba.bitLength(updateCtx)/8)));
+        request = ba.concat(request, [ba.partial(8,  eb.comm.hotp.TLV_TYPE_UPDATEAUTHCONTEXT)]);
+        request = ba.concat(request, [ba.partial(16, ba.bitLength(updateCtx)/8)]);
         request = ba.concat(request, updateCtx);
 
         return request;
@@ -4717,6 +4751,7 @@ eb.comm.hotp.authContextUpdateRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
  * @type {{}}
  */
 eb.comm.createUO = {};
+eb.comm.createUO.utils = {};
 eb.comm.createUO.consts = {
     YES: "yes",
     NO: "no",
@@ -4815,11 +4850,13 @@ eb.comm.createUO.consts = {
     },
 
     genKey: {
-        LOCAL: 0,
-        SERVER: 1,
+        LEGACY_RANDOM: 0,
+        CLIENT: 1,
         COMP1: 2,
         COMP2: 3,
-        COMP3: 4
+        COMP3: 4,
+        SERVER_RANDOM: 5,
+        SERVER_DERIVED: 6
     }
 };
 
@@ -4890,9 +4927,9 @@ eb.comm.createUO.getUOTemplateRequest.inheritsFrom(eb.comm.apiRequest, {
         "resource": eb.comm.createUO.consts.resource.GLOBAL,
         "credit": 256, // <1-32767>, a limit a seed card can provide to the EB service
         "generation": {
-            "commkey": eb.comm.createUO.consts.genKey.SERVER,
-            "billingkey": eb.comm.createUO.consts.genKey.SERVER,
-            "appkey": eb.comm.createUO.consts.genKey.SERVER
+            "commkey": eb.comm.createUO.consts.genKey.SERVER_RANDOM,
+            "billingkey": eb.comm.createUO.consts.genKey.SERVER_RANDOM,
+            "appkey": eb.comm.createUO.consts.genKey.SERVER_RANDOM
         }
     },
 
@@ -5109,6 +5146,7 @@ eb.comm.createUO.templateFiller.prototype = {
         var encOffset = template.encryptionoffset;
         var keysOffset = template.keyoffsets || [];
         var importKeys = template.importkeys || [];
+        var appKeyProvided = false;
 
         // Raw template to fill-in.
         var ba = eb.misc.inputToBits(template.template);
@@ -5128,11 +5166,24 @@ eb.comm.createUO.templateFiller.prototype = {
                 continue;
             }
 
+            if (cKeyOff.type == "app"){
+                appKeyProvided = true;
+            }
+
             // before + key + after
-            baOrig = ba;
-            ba = w.concat(w.bitSlice(baOrig, 0, cKeyOff.offset), cKeyVal); // before + key
-            ba = w.concat(ba, w.bitSlice(baOrig, cKeyOff.offset + cKeyOff.length)); // after
+            ba = eb.misc.replacePart(ba, cKeyOff.offset, cKeyOff.offset + cKeyOff.length, cKeyVal);
         }
+
+        // Reset comm key flag - generated by client.
+        // 0x8 position, in short. flagOffset points to MSB byte of the short.
+        ba = eb.misc.transformPart(ba, template.flagoffset, template.flagoffset+8, function(x){
+            var num = sjcl.bitArray.extract(x, 0, 8);
+            num &= ~0x8;
+            if (appKeyProvided){
+                num &= ~0x10;
+            }
+            return [sjcl.bitArray.partial(8, num)];
+        });
 
         // Encrypt template from encOffset.
         baPlain = w.bitSlice(ba, 0, encOffset);
