@@ -322,7 +322,7 @@ sjcl.codec.base32hex = {
  * @type {{name: string}}
  */
 var eb = {
-    name: "EB",
+    name: "EB"
 };
 
 /** @namespace Exceptions. */
@@ -340,8 +340,8 @@ eb.exception = {
             return "INVALID: " + this.message;
         };
         this.message = message;
-    },
-}
+    }
+};
 
 /**
  * EB misc wrapper.
