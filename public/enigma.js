@@ -1629,11 +1629,11 @@ eb.comm.processDataResponse.inheritsFrom(eb.comm.response, {
      */
     isMacOk: function(){
         var ba = sjcl.bitArray;
-        return this.mac
-            && this.computedMac
-            && ba.bitLength(this.mac) == 16*8
-            && ba.bitLength(this.computedMac) == 16*8
-            && ba.equal(this.mac, this.computedMac);
+        return this.mac         &&
+            this.computedMac    &&
+            ba.bitLength(this.mac) == 16 * 8         &&
+            ba.bitLength(this.computedMac) == 16 * 8 &&
+            ba.equal(this.mac, this.computedMac);
     },
 
     toString: function(){
