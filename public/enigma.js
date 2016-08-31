@@ -4197,9 +4197,9 @@ eb.comm.hotp.authContextUpdateRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
 
     // (public) Constructor
     function BigInteger(a,b,c) {
-        if(a != null)
+        if(a !== null)
             if("number" == typeof a) this.fromNumber(a,b,c);
-            else if(b == null && "string" != typeof a) this.fromString(a,256);
+            else if(b === null && "string" != typeof a) this.fromString(a,256);
             else this.fromString(a,b);
     }
     BigIntegerModule.BigInteger = BigInteger;
@@ -4276,7 +4276,7 @@ eb.comm.hotp.authContextUpdateRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
 
     // Digit conversions
     var BI_RM = "0123456789abcdefghijklmnopqrstuvwxyz";
-    var BI_RC = new Array();
+    var BI_RC = [];
     var rr,vv;
     rr = "0".charCodeAt(0);
     for(vv = 0; vv <= 9; ++vv) BI_RC[rr++] = vv;
@@ -4288,7 +4288,7 @@ eb.comm.hotp.authContextUpdateRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
     function int2char(n) { return BI_RM.charAt(n); }
     function intAt(s,i) {
         var c = BI_RC[s.charCodeAt(i)];
-        return (c==null)?-1:c;
+        return (c===null)?-1:c;
     }
 
     // (protected) copy this to r
@@ -4330,7 +4330,7 @@ eb.comm.hotp.authContextUpdateRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
                 continue;
             }
             mi = false;
-            if(sh == 0)
+            if(sh === 0)
                 this[this.t++] = x;
             else if(sh+k > this.DB) {
                 this[this.t-1] |= (x&((1<<(this.DB-sh))-1))<<sh;
@@ -4551,7 +4551,7 @@ eb.comm.hotp.authContextUpdateRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
         else { pm.copyTo(y); pt.copyTo(r); }
         var ys = y.t;
         var y0 = y[ys-1];
-        if(y0 == 0) return;
+        if(y0 === 0) return;
         var yt = y0*(1<<this.F1)+((ys>1)?y[ys-2]>>this.F2:0);
         var d1 = this.FV/yt, d2 = (1<<this.F1)/yt, e = 1<<this.F2;
         var i = r.t, j = i-ys, t = (q==null)?nbi():q;
@@ -4620,7 +4620,7 @@ eb.comm.hotp.authContextUpdateRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
     function bnpInvDigit() {
         if(this.t < 1) return 0;
         var x = this[0];
-        if((x&1) == 0) return 0;
+        if((x&1) === 0) return 0;
         var y = x&3;		// y == 1/x mod 2^2
         y = (y*(2-(x&0xf)*y))&0xf;	// y == 1/x mod 2^4
         y = (y*(2-(x&0xff)*y))&0xff;	// y == 1/x mod 2^8
@@ -4691,7 +4691,7 @@ eb.comm.hotp.authContextUpdateRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
     Montgomery.prototype.sqrTo = montSqrTo;
 
     // (protected) true iff this is even
-    function bnpIsEven() { return ((this.t>0)?(this[0]&1):this.s) == 0; }
+    function bnpIsEven() { return ((this.t>0)?(this[0]&1):this.s) === 0; }
 
     // (protected) this^e, e < 2^32, doing sqr and mul with "r" (HAC 14.79)
     function bnpExp(e,z) {
