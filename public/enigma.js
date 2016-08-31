@@ -809,7 +809,7 @@ eb.codec.utf8 = {
             cNum = sjcl.bitArray.extract(cBits,0,8);
 
             // 1byte char representation. ASCII.
-            if (!acceptUtf8 || (cNum & 0x80) == 0){
+            if (!acceptUtf8 || (cNum & 0x80) === 0){
                 var tmpChar = String.fromCharCode(cNum);
                 if (tmpChar === "\\"){
                     tmpChar = "\\\\";
@@ -874,7 +874,7 @@ eb.codec.utf8 = {
 
                 // utfOut needs to be left padded with zeros to be correctly interpreted.
                 utfOutLen = sjcl.bitArray.bitLength(utfOut);
-                if ((utfOutLen & 7) != 0){
+                if ((utfOutLen & 7) !== 0){
                     var toPadLen = 8-(utfOutLen & 7);
                     utfOut = sjcl.bitArray.concat(sjcl.bitArray.bitSlice(h.toBits("00"),0,toPadLen), utfOut);
                 }
@@ -976,7 +976,7 @@ eb.padding.pkcs7 = {
         }
 
         var bi = a[((bl>>3)>>2) - 1] & 255;
-        if (bi == 0 || bi > 16) {
+        if (bi === 0 || bi > 16) {
             throw new sjcl.exception.corrupt("pkcs#5 padding corrupt");
         }
 
@@ -1019,7 +1019,7 @@ eb.padding.pkcs15 = {
             throw new sjcl.exception.corrupt("input type has to have be byte padded, bl="+bl);
         }
 
-        if (bt != 0 && bt != 1 && bt != 2){
+        if (bt !== 0 && bt !== 1 && bt !== 2){
             throw new sjcl.exception.corrupt("invalid BT size");
         }
 
@@ -1036,7 +1036,7 @@ eb.padding.pkcs15 = {
             } else if (bt == 2){
                 do {
                     curByte = (sjcl.random.randomWords(1)[0]) & 0xff;
-                }while(curByte == 0);
+                }while(curByte === 0);
             }
 
             tmp = tmp << 8 | curByte;
@@ -1066,7 +1066,7 @@ eb.padding.pkcs15 = {
         // Check the first byte.
         var bOffset = 0;
         var prefixByte = w.extract(a, bOffset, 8);
-        if (prefixByte != 0x0){
+        if (prefixByte !== 0x0){
             throw new sjcl.exception.corrupt("data size block is invalid");
         }
 
@@ -1074,17 +1074,17 @@ eb.padding.pkcs15 = {
         var bt = w.extract(a, bOffset, 8);
 
         // BT can be only from set {0,1,2}.
-        if (bt != 0 && bt != 1 && bt != 2){
+        if (bt !== 0 && bt !== 1 && bt !== 2){
             throw new sjcl.exception.corrupt("Padding data error, BT is outside of the definition set");
         }
 
         // Find D in the padded data. Strategy depends on the BT.
         var dataPosStart = -1, i= 0, cur=0;
-        if (bt == 0){
+        if (bt === 0){
             // Scan for first non-null character.
             for(i = 2; i < blb; i++){
                 cur = w.extract(a, 8*i, 8);
-                if (cur != 0){
+                if (cur !== 0){
                     dataPosStart = i;
                     break;
                 }
@@ -1095,11 +1095,11 @@ eb.padding.pkcs15 = {
             var ffCorrect = true;
             for(i = 2; i < blb; i++){
                 cur = w.extract(a, 8*i, 8);
-                if (cur != 0 && cur != 0xff) {
+                if (cur !== 0 && cur !== 0xff) {
                     ffCorrect = false;
                 }
 
-                if (cur == 0){
+                if (cur === 0){
                     dataPosStart = i+1;
                     break;
                 }
@@ -1113,7 +1113,7 @@ eb.padding.pkcs15 = {
             // bt == 2, find 0x0.
             for(i = 2; i < blb; i++){
                 cur = w.extract(a, 8*i, 8);
-                if (cur == 0){
+                if (cur === 0){
                     dataPosStart = i+1;
                     break;
                 }
@@ -1192,10 +1192,10 @@ sjcl.mode.cbc = {
         }
 
         var i, w = sjcl.bitArray, bl = w.bitLength(b), bp = 0, output = [], xor = eb.misc.xor;
-        if (noPad && (bl & 127) != 0){
+        if (noPad && (bl & 127) !== 0){
             throw new sjcl.exception.invalid("when padding is disabled, plaintext has to be a positive multiple of a block size");
         }
-        if ((bl & 7) != 0) {
+        if ((bl & 7) !== 0) {
             throw new sjcl.exception.invalid("pkcs#5 padding only works for multiples of a byte");
         }
 
@@ -1232,7 +1232,7 @@ sjcl.mode.cbc = {
         }
         if (!noPad) {
             bi = output[i - 1] & 255;
-            if (bi == 0 || bi > 16) {
+            if (bi === 0 || bi > 16) {
                 throw new sjcl.exception.corrupt("pkcs#5 padding corrupt"); //TODO: padding oracle?
             }
             bo = bi * 0x1010101;
@@ -1297,7 +1297,7 @@ eb.comm = {
     demangleNonce: function(nonce){
         var ba = sjcl.bitArray;
         var bl = ba.bitLength(nonce);
-        if ((bl&7) != 0){
+        if ((bl&7) !== 0){
             throw new sjcl.exception.invalid("nonce has to be aligned to bytes");
         }
 
@@ -1885,12 +1885,12 @@ eb.comm.processDataResponseParser.inheritsFrom(eb.comm.responseParser, {
         // Verify MAC.
         var macTagOffset = protectedBitsBl - 16*8;
         var dataToMac = ba.bitSlice(protectedBits, 0, macTagOffset);
-        if ((ba.bitLength(dataToMac) & 127) != 0){
+        if ((ba.bitLength(dataToMac) & 127) !== 0){
             throw new sjcl.exception.corrupt("Padding size invalid");
         }
 
         resp.mac = ba.bitSlice(protectedBits, macTagOffset);
-        if (ba.bitLength(resp.mac) != 16*8){
+        if (ba.bitLength(resp.mac) !== 16*8){
             throw new sjcl.exception.corrupt("MAC corrupted");
         }
 
@@ -1901,7 +1901,7 @@ eb.comm.processDataResponseParser.inheritsFrom(eb.comm.responseParser, {
 
         // Decrypt.
         var dataToDecrypt = ba.bitSlice(protectedBits, 0, macTagOffset);
-        if ((ba.bitLength(dataToDecrypt) & 127) != 0){
+        if ((ba.bitLength(dataToDecrypt) & 127) !== 0){
             throw new sjcl.exception.corrupt("Ciphertext block invalid");
         }
 
@@ -1912,7 +1912,7 @@ eb.comm.processDataResponseParser.inheritsFrom(eb.comm.responseParser, {
 
         // Check the flag.
         var responseFlag = ba.extract(decryptedData, 0, 8);
-        if (responseFlag != 0xf1){
+        if (responseFlag !== 0xf1){
             throw new sjcl.exception.corrupt("Given data packet is not a response (flag mismatch)");
         }
 
@@ -2902,7 +2902,7 @@ eb.comm.hotp = {
         // Add Password method, if desired.
         if (usePass){
             var hash = options && options.passwd && options.passwd.hash;
-            if (hash === undefined || hash.length == 0) {
+            if (hash === undefined || hash.length === 0) {
                 throw new eb.exception.invalid("Password auth method specified, empty hash");
             }
 
@@ -2973,11 +2973,11 @@ eb.comm.hotp = {
      */
     userIdBitsNormalize: function(x){
         var ln = x.length;
-        if (ln == 2){
+        if (ln === 2){
             return x;
-        } else if (ln == 0){
+        } else if (ln === 0){
             return [0,0];
-        } else if (ln == 1){
+        } else if (ln === 1){
             return [0, x[0]];
         } else {
             return [x[0], x[1]];
@@ -3700,7 +3700,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
             if (bIsLocalCtxUpdate){
                 response.hotpKey = ba.bitSlice(data, offset, offset+dataReturnLen*8);
 
-            } else if (dataReturnLen != 0) {
+            } else if (dataReturnLen !== 0) {
                 throw new eb.exception.corrupt("Should not contain data");
             }
 
@@ -3718,7 +3718,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
 
             dataReturnLen = ba.extract(data, offset, 16);
             offset += 16;
-            if (dataReturnLen != 0) {
+            if (dataReturnLen !== 0) {
                 throw new eb.exception.corrupt("Should not contain data");
             }
         }
@@ -3734,7 +3734,7 @@ eb.comm.hotp.generalHotpParser.inheritsFrom(eb.comm.base, {
 
             dataReturnLen = ba.extract(data, offset, 16);
             offset += 16;
-            if (dataReturnLen != 0) {
+            if (dataReturnLen !== 0) {
                 throw new eb.exception.corrupt("Should not contain data");
             }
         }
@@ -4341,7 +4341,7 @@ eb.comm.hotp.authContextUpdateRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
             sh += k;
             if(sh >= this.DB) sh -= this.DB;
         }
-        if(k == 8 && (s[0]&0x80) != 0) {
+        if(k == 8 && (s[0]&0x80) !== 0) {
             this.s = -1;
             if(sh > 0) this[this.t-1] |= ((1<<(this.DB-sh))-1)<<sh;
         }
@@ -4394,22 +4394,22 @@ eb.comm.hotp.authContextUpdateRequest.inheritsFrom(eb.comm.hotp.hotpRequest, {
     // (public) return + if this > a, - if this < a, 0 if equal
     function bnCompareTo(a) {
         var r = this.s-a.s;
-        if(r != 0) return r;
+        if(r !== 0) return r;
         var i = this.t;
         r = i-a.t;
-        if(r != 0) return (this.s<0)?-r:r;
-        while(--i >= 0) if((r=this[i]-a[i]) != 0) return r;
+        if(r !== 0) return (this.s<0)?-r:r;
+        while(--i >= 0) if((r=this[i]-a[i]) !== 0) return r;
         return 0;
     }
 
     // returns bit length of the integer x
     function nbits(x) {
         var r = 1, t;
-        if((t=x>>>16) != 0) { x = t; r += 16; }
-        if((t=x>>8) != 0) { x = t; r += 8; }
-        if((t=x>>4) != 0) { x = t; r += 4; }
-        if((t=x>>2) != 0) { x = t; r += 2; }
-        if((t=x>>1) != 0) { x = t; r += 1; }
+        if((t=x>>>16) !== 0) { x = t; r += 16; }
+        if((t=x>>8) !== 0) { x = t; r += 8; }
+        if((t=x>>4) !== 0) { x = t; r += 4; }
+        if((t=x>>2) !== 0) { x = t; r += 2; }
+        if((t=x>>1) !== 0) { x = t; r += 1; }
         return r;
     }
 
