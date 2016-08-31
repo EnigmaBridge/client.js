@@ -1,4 +1,6 @@
+/*jshint globalstrict: true*/
 "use strict";
+
 /**
  * EnigmaBridge API helper functions.
  * @author Dusan Klinec (ph4r05)
