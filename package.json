@@ -36,10 +36,11 @@
   },
   "main": "./lib/enigma.js",
   "dependencies": {
+    "extend": "^3.0.0",
     "sjcl": "^1.0.3",
     "jsbn": "^0.1.0",
     "sprintf-js": "^1.0.3",
-    "jquery": "^1.12.0"
+    "superagent": "^2.2.0"
   },
   "devDependencies": {
     "eslint": "^0.21.2",
