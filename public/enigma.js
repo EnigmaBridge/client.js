@@ -18,7 +18,7 @@ Function.prototype.inheritsFrom = function( parentClassOrObject, newPrototype ){
     if ( parentClassOrObject.constructor == Function )
     {
         //Normal Inheritance
-        this.prototype = new parentClassOrObject;
+        this.prototype = new parentClassOrObject();
         this.prototype.constructor = this;
         this.prototype.parent = parentClassOrObject.prototype;
 
@@ -284,7 +284,7 @@ sjcl.codec.base32 = {
 
         if (_hex) {
             c = sjcl.codec.base32._hexChars;
-            format = "base32hex"
+            format = "base32hex";
         }
 
         for (i=0; i<str.length; i++) {
@@ -606,7 +606,7 @@ eb.misc = {
      */
     padHexToSize: function(x, size){
         x = x.trim().replace(/[\s]+/g, '').replace(/^0x/, '');
-        return (x.length<size) ? (('0'.repeat(size-x.length))+x) : x
+        return (x.length<size) ? (('0'.repeat(size-x.length))+x) : x;
     },
 
     /**
