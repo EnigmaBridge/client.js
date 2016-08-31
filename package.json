@@ -1,16 +1,64 @@
 {
-  "name": "ebrest",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "ebclient.js",
+  "version": "0.0.1",
+  "author": {
+    "name": "Dusan Klinec",
+    "email": "dusan@enigmabridge.com",
+    "url": "https://enigmabridge.com/"
+  },
+  "description": "Client library for using EnigmaBridge crypto services",
+  "keywords": [
+    "encryption",
+    "HSM",
+    "middleware",
+    "enigmabridge"
+  ],
+  "homepage": "https://github.com/EnigmaBridge/client.js",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:EnigmaBridge/client.js.git"
+  },
+  "contributors": [
+    {
+      "name": "Dusan Klinec",
+      "email": "dusan@enigmabridge.com",
+      "url": "https://enigmabridge.com/"
+    },
+    {
+      "name": "Dan Cvrcek",
+      "email": "dan@enigmabridge.com",
+      "url": "https://enigmabridge.com/"
+    }
+  ],
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/EnigmaBridge/client.js/issues"
+  },
+  "main": "./lib/enigma.js",
   "dependencies": {
-    "express": "^4.13.4",
-    "sprintf-js": "^1.0.3"
+    "sprintf-js": "^1.0.3",
+    "sjcl": "^1.0.3"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "eslint": "^0.21.2",
+    "grunt": "*",
+    "grunt-contrib-watch": "*",
+    "grunt-contrib-uglify": "*"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm run lint && ./node_modules/mocha/bin/mocha",
+    "lint": "./node_modules/eslint/bin/eslint.js lib test"
   },
-  "author": "",
-  "license": "ISC"
+  "gitHead": "bef1a97c22a3f15cb23ab2d9cf8e7e3f7134e107",
+  "_npmUser": {
+    "name": "ph4r05",
+    "email": "dusan.klinec@gmail.com"
+  },
+  "maintainers": [
+    {
+      "name": "ph4r05",
+      "email": "ph4r05@gmail.com"
+    }
+  ],
+  "directories": {}
 }
