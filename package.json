@@ -50,6 +50,7 @@
     "grunt-browserify": "*",
     "jshint": "latest",
     "browserify": "latest",
+    "minifyify": "latest",
     "watch": "latest",
     "mocha": "latest",
     "rimraf": "latest",
