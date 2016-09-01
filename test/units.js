@@ -1,5 +1,6 @@
 var expect    = require("chai").expect;
 var eb        = require("../lib/enigma");
+var rnd       = eb.misc.sjcl.random;
 
 // For more info:
 // https://mochajs.org/
@@ -7,7 +8,7 @@ describe("EB client units", function() {
     /**
      * Install fix seeded random number generator.
      */
-    before(function(){
+    beforeEach(function(){
         var FixRandom = function(seed){ this.seed = seed; };
         FixRandom.prototype = {
             gen: function(){
@@ -41,7 +42,7 @@ describe("EB client units", function() {
         });
     });
 
-    describe("CBC-MAC", function() {
+    describe("crypto", function() {
         it("cbc-mac-test01", function() {
             var macKeyBits = eb.misc.inputToBits("0123456789aabbccddeeff0011223344");
             var aesMac = new eb.misc.sjcl.cipher.aes(macKeyBits);
@@ -49,10 +50,29 @@ describe("EB client units", function() {
             var hmacData = hmac.mac(eb.misc.inputToBits("0000111122223333444455556666777788889999aaaabbbbccccddddeeeeffff"));
             expect(eb.misc.inputToHex(hmacData)).to.equal("54e552ceb4665f8d65f467e5c84e6316");
         });
+
+        it("padding-pkcs7", function() {
+            for(var i=0; i<10; i++){
+                var ln = 8*(1 + Math.abs(rnd.randomWords(1)[0] % 64));
+                var input = eb.misc.getRandomBits(ln);
+                var out = eb.padding.pkcs7.unpad(eb.padding.pkcs7.pad(input));
+                expect(eb.misc.inputToHex(out)).to.equal(eb.misc.inputToHex(input));
+            }
+        });
+
+        it("padding-pkcs15", function() {
+            for(var i=0; i<10; i++){
+                var ln = 8*(1 + Math.abs(rnd.randomWords(1)[0] % 120));
+                var mode = 1 + Math.abs(rnd.randomWords(1)[0] % 2);
+                var input = eb.misc.getRandomBits(ln);
+                var out = eb.padding.pkcs15.unpad(eb.padding.pkcs15.pad(input, 1024, mode));
+                expect(eb.misc.inputToHex(out)).to.equal(eb.misc.inputToHex(input));
+            }
+        });
     });
 
-    describe("ProcessDataBuilder", function(){
-        it("process-data-enc-mac", function(){
+    describe("ProcessData", function(){
+        it("request-builder", function(){
             var input  = eb.misc.inputToBits("6bc1bee22e409f96e93d7e117393172a");
             var aesKey = eb.misc.inputToBits("e134567890123456789012345678901234567890123456789012345678901234");
             var macKey = eb.misc.inputToBits("e224262820223456789012345678901234567890123456789012345678901234");
@@ -103,7 +123,7 @@ describe("EB client units", function() {
                     key:appKey}
             };
             var buildReq = builder.build({keys: keys});
-            expect(eb.misc.inputToHex(buildReq.uo)).to.equal("a101007ccdd23f8ac110facbf2c85b501786e0f1bd2d6839d9bd758ee795c08ef6b574f77b63e3ce79f2f2bf9faccbce1a22b69181eff0b77266f8ce9c7f94a50c5c1d5affabdc0a62b9765dc8f8313598ab96ebde7be3d308812e401d7d6fa94329a4a8d710f3457f272b8349686eca2de502cc996c735bd1927d39ec5656b4e36df7f4e50eb5c576d04d4d3a98cbfee4b04a0655a42b55fa6ffe5ed689de11e79e437e7e04012a5faf8703a938e0e0deaa4ae6b7e88bd0b754bb9a08dabd4dc64f5fdd220f366f67a1807bb13c07bfbdc42612bc4a2fbf1762d7b31883f5127bd41beefee00a0c820d64ff5d6f21a9346d3ed4c23b886e9b1e47edd7cd978b1f5b6ea2013001134301010000226a00300004040200170035002300fdd00000000000000000010db0001001000000000000000000000000000000a24aa0f4f36ce62a1b5ea51fa16ca5b419672b895f52da588b432f65af909ef9b8c80a04e7e8b9e76b260534c336f4990448a9abf38a529f2e0822d08b52fbca2a4101896135b53ad934bd4db6be5aedc5206ed1bd1e95a0d38e4725b807299bb391bb6e2af5d52d561173f8c3166070d4bf8e4921e2fa78474d04cfc40deab2176ebdae4c956c3c726748202c61134369bce12ae8e0198038995b8bcc4d51d00f3f3328d835eb729770b4eb4364e7d096a6d4a91f8cecff1b06771484954cb2d7c93f9feb086e095d802250cf14d4dadc676c5b14994722bf3387692748cf280b0b0b0b0b0b0b0b0b0b0b429bc5f0034ec76e11f0ef35f91bc8b7");
+            expect(eb.misc.inputToHex(buildReq.uo)).to.equal("a101003998cfc55a52639be8654e63dbcca2d6638d3ebfafa37fbe5febe11d6dbc43ed415dff7bde21ef30f59cef80d0fe3634fe316b0dffbf2f2139bd1d833eee28ec6dc2cf39e803ea6286cfd192ea4a3eea9c186b0cc5c4a17be06dcb2594ede99a662d577f7d6fd68e11e95ccd5f41ab2d28b654a50efa634cadac077457936245dfc2941faa4c8f583e65842a8afa73c005c61f541814bda8a71b40a4241f4e7b4bb9c9660f3f2d2c007e7c10181a5d4bef4619bbe96abd22c9a9673f767870f5abb5b04db302302f6eb37f48560ea4c87f0002d469cdbbcd903717ac37c8e35abd6c8ac81c0c6701d7dade86a681fb6758fffb4dc15a1d283c7d4b68e76e9b6ea2013001134301010000226a00300004040200170035002300fdd00000000000000000010db00010010000000000000000000000000000006c063d46dd808616a5979af881ae2a757fdd36bebe89c2f58b6134fdde9a39ec8f037489dfa2da943c55c8862afd7e8a60377058c5f8c8cb220fa26e80a95aee65580b65511decde8a7b7e142445e10382c0b9a97e1de28e49b2f8d6e9c7607546c0e0db474de07787a43f65c0305fcb619e86eb713b9df4e790486ded39317dc2dd28aab3b4d9e2e54a24d3312b99e7044273384d76ffa5b3b589e1c20423293997b1c6fd918d927c11eb33fbf0a85b7641deecf21491a4348986ceb69b4560833c40ba81ff2f39078387c9954dc3803c0dac2f69476c52509e33459111b0db0b0b0b0b0b0b0b0b0b0b0b5ef81fd00a8f6f2368b9428a621f9067");
         });
     });
 });
