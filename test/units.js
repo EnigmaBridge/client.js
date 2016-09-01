@@ -1,6 +1,7 @@
-var expect    = require("chai").expect;
-var eb        = require("../lib/enigma");
-var rnd       = eb.misc.sjcl.random;
+"use strict";
+var expect = require("chai").expect;
+var eb = require("../lib/enigma");
+var rnd = eb.misc.sjcl.random;
 
 // For more info:
 // https://mochajs.org/

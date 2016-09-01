@@ -1,6 +1,6 @@
-var expect    = require("chai").expect;
-var should    = require("chai").should;
-var eb        = require("../lib/enigma");
+"use strict";
+var expect = require("chai").expect;
+var eb = require("../lib/enigma");
 
 var endpoint = "site2.enigmabridge.com";
 var settings = {
