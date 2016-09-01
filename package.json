@@ -52,6 +52,7 @@
     "minifyify": "latest",
     "watch": "latest",
     "mocha": "latest",
+    "chai": "latest",
     "rimraf": "latest",
     "shelljs": "^0.7.4"
   },
