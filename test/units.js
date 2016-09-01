@@ -1,6 +1,8 @@
 var expect    = require("chai").expect;
 var eb        = require("../lib/enigma");
 
+// For more info:
+// https://mochajs.org/
 describe("EB client units", function() {
     /**
      * Install fix seeded random number generator.
