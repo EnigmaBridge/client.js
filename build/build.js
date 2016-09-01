@@ -15,6 +15,6 @@ shell.exec("cd ./node_modules/sjcl/ && make");
 shell.exec("./node_modules/.bin/browserify --no-builtins --standalone eb lib/enigma.js > dist/enigma.js");
 
 // Browserify + minify
-shell.exec("browserify lib/enigma.js --no-builtins --standalone eb " +
+shell.exec("./node_modules/.bin/browserify --no-builtins --standalone eb lib/enigma.js " +
     "-d -p [minifyify --map dist/enigma.js.map --output dist/enigma.js.map] > dist/enigma.min.js");
 
