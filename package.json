@@ -59,8 +59,9 @@
     "clean": "rimraf dist/*",
     "prebuild": "npm run clean -s",
     "build": "build/build.js",
-    "test": "npm run lint && ./node_modules/mocha/bin/mocha",
-    "lint": "./node_modules/eslint/bin/eslint.js lib test"
+    "test": "./node_modules/mocha/bin/mocha",
+    "lint": "./node_modules/eslint/bin/eslint.js lib test",
+    "prepublish": "npm run build"
   },
   "gitHead": "bef1a97c22a3f15cb23ab2d9cf8e7e3f7134e107",
   "_npmUser": {
