@@ -58,7 +58,7 @@
   },
   "scripts": {
     "clean": "rimraf dist/*",
-    "prebuild": "npm run clean -s",
+    "prebuild": "npm run clean -s && npm run test",
     "build": "build/build.js",
     "test": "./node_modules/mocha/bin/mocha",
     "lint": "./node_modules/eslint/bin/eslint.js lib test",
