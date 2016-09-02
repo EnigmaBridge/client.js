@@ -66,13 +66,13 @@ function processFail(self, done){
 describe("Functional tests", function() {
     describe("ProcessData", function(){
         // Retry all tests in this suite up to 5 times
-        this.retries(5);
+        this.retries(7);
 
         it("plainaes", function(done){
             var input = '6bc1bee22e409f96e93d7e117393172a';
             var cfg = {
-                userObjectId:    'EE01',
-                callRequestType: 'PLAINAES',
+                uoId:    'EE01',
+                uoType:  '4',
                 aesKey: 'e134567890123456789012345678901234567890123456789012345678901234',
                 macKey: 'e224262820223456789012345678901234567890123456789012345678901234'};
 
@@ -87,8 +87,7 @@ describe("Functional tests", function() {
         it("plainaesdecrypt", function(done){
             var input = '95c6bb9b6a1c3835f98cc56087a03e82';
             var cfg = {
-                userObjectId:    'EE02',
-                callRequestType: 'PLAINAESDECRYPT',
+                uoId:    'EE02',
                 aesKey: 'e134567890123456789012345678901234567890123456789012345678901234',
                 macKey: 'e224262820223456789012345678901234567890123456789012345678901234'};
 
@@ -103,7 +102,7 @@ describe("Functional tests", function() {
         it("rsa1024-test", function(done){
             var input = '1122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788112233445566778811223344556677881122334455667788';
             var cfg = {
-                userObjectId:    '7654',
+                uoId:    '7654',
                 aesKey: '1234567890123456789012345678901234567890123456789012345678901234',
                 macKey: '2224262820223456789012345678901234567890123456789012345678901234'};
 
@@ -118,7 +117,7 @@ describe("Functional tests", function() {
         it("rsa1024-one", function(done){
             var input = '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001';
             var cfg = {
-                userObjectId:    '7654',
+                uoId:    '7654',
                 aesKey: '1234567890123456789012345678901234567890123456789012345678901234',
                 macKey: '2224262820223456789012345678901234567890123456789012345678901234'};
 
