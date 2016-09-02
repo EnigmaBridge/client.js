@@ -2,12 +2,9 @@
 var expect = require("chai").expect;
 var eb = require("../lib/enigma");
 
-var endpoint = "site2.enigmabridge.com";
 var settings = {
-    remoteEndpoint: endpoint,
-    remotePort: 11180,
+    host: "https://site2.enigmabridge.com:11180",
     requestMethod: "POST",
-    requestScheme: "https",
     requestTimeout: 7000,
     debuggingLog: false,
     apiKey: "TEST_API"
@@ -40,7 +37,7 @@ function simpleProcessData(config, input, onDone, onFail, onAlways){
     request.doRequest();
 }
 
-function checkProcessDataResponse(done, expected){
+function checkProcessDataResponse(self, done, expected){
     return function(data){
         expect(data).to.have.property('protectedData');
         expect(data.protectedData).to.be.a('array');
@@ -49,8 +46,17 @@ function checkProcessDataResponse(done, expected){
     }
 }
 
-function processFail(done){
+function processFail(self, done){
     return function(a, b){
+        if (a == 2 && b !== undefined && b.response !== undefined){
+            var status = b.response.statusCode;
+            // Return success on backend fails.
+            if (status === 0xa0d2){ // no credits for UO left.
+                self.skip();
+                return;
+            }
+        }
+
         done(a);
     }
 }
@@ -73,8 +79,8 @@ describe("Functional tests", function() {
             simpleProcessData(
                 cfg,
                 eb.misc.inputToBits(input),
-                checkProcessDataResponse(done, '95c6bb9b6a1c3835f98cc56087a03e82'),
-                processFail(done)
+                checkProcessDataResponse(this, done, '95c6bb9b6a1c3835f98cc56087a03e82'),
+                processFail(this, done)
             );
         });
 
@@ -89,8 +95,8 @@ describe("Functional tests", function() {
             simpleProcessData(
                 cfg,
                 eb.misc.inputToBits(input),
-                checkProcessDataResponse(done, '6bc1bee22e409f96e93d7e117393172a'),
-                processFail(done)
+                checkProcessDataResponse(this, done, '6bc1bee22e409f96e93d7e117393172a'),
+                processFail(this, done)
             );
         });
 
@@ -104,8 +110,8 @@ describe("Functional tests", function() {
             simpleProcessData(
                 cfg,
                 eb.misc.inputToBits(input),
-                checkProcessDataResponse(done, '683f4c45dc659d0df54b5eb15a058bb69169d7e7c06a5e28f3042f398fb84537ee48530a5873d9749e5accb756da5b246c35f3c4fd47bca7c27d2e3c3737330f11fce4302f1afd81ee1c37de6bc25b6e48fa5c228bce29c09c8cb49432d2d2807a09d189ee5df515c271bc9093f7a852d7aa00baa957c3cd9409452b4a4964c5'),
-                processFail(done)
+                checkProcessDataResponse(this, done, '683f4c45dc659d0df54b5eb15a058bb69169d7e7c06a5e28f3042f398fb84537ee48530a5873d9749e5accb756da5b246c35f3c4fd47bca7c27d2e3c3737330f11fce4302f1afd81ee1c37de6bc25b6e48fa5c228bce29c09c8cb49432d2d2807a09d189ee5df515c271bc9093f7a852d7aa00baa957c3cd9409452b4a4964c5'),
+                processFail(this, done)
             );
         });
 
@@ -119,8 +125,8 @@ describe("Functional tests", function() {
             simpleProcessData(
                 cfg,
                 eb.misc.inputToBits(input),
-                checkProcessDataResponse(done, '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001'),
-                processFail(done)
+                checkProcessDataResponse(this, done, '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001'),
+                processFail(this, done)
             );
         });
     });
