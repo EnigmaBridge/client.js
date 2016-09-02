@@ -21,7 +21,6 @@ describe("Client", function() {
     this.timeout(150000);
 
     it("processData", function (done) {
-        done();return;
         var input = '6bc1bee22e409f96e93d7e117393172a';
         var cfg = eb.misc.extend(true, {}, settings, {
             uoId: 'EE01',
