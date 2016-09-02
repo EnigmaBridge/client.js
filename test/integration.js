@@ -65,8 +65,9 @@ function processFail(self, done){
 // https://mochajs.org/
 describe("Functional tests", function() {
     describe("ProcessData", function(){
-        // Retry all tests in this suite up to 5 times
-        this.retries(7);
+        // Retry all tests in this suite up to X times
+        this.retries(6);
+        this.timeout(7000);
 
         it("plainaes", function(done){
             var input = '6bc1bee22e409f96e93d7e117393172a';

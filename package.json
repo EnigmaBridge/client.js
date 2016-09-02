@@ -1,6 +1,6 @@
 {
   "name": "ebclient.js",
-  "version": "0.1.5",
+  "version": "0.1.8",
   "author": {
     "name": "Dusan Klinec",
     "email": "dusan@enigmabridge.com",
@@ -35,7 +35,12 @@
     "url": "https://github.com/EnigmaBridge/client.js/issues"
   },
   "main": "./lib/enigma.js",
+  "bin": {
+    "es": "./bin/eb.js"
+  },
   "dependencies": {
+    "bluebird": "^3.4.6",
+    "commander": "^2.9.0",
     "extend": "^3.0.0",
     "jsbn": "^0.1.0",
     "sjcl": "^1.0.3",
