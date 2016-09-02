@@ -5,3 +5,4 @@ node_modules
 /tmp
 /lib/built/sjcl/*.js
 /lib/built/sjcl/*.map
+npm-debug.log
