@@ -9,7 +9,10 @@ shell.exec("cd ./node_modules/sjcl/ && ./configure " +
     "--with-codecBytes " +
     "--with-sha1");
 
-shell.exec("cd ./node_modules/sjcl/ && make");
+// Make & Backup specially modified SJCL to the lib
+shell.exec("cd ./node_modules/sjcl/ && make " +
+    "&& cp core.js ../../lib/built/sjcl/sjcl.max.js" +
+    "&& cp sjcl.js ../../lib/built/sjcl/sjcl.js");
 
 // Browserify.
 shell.exec("./node_modules/.bin/browserify --no-builtins --standalone eb -r url lib/enigma.js > dist/enigma.js");
