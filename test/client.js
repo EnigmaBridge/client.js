@@ -15,6 +15,21 @@ var settings = {
     }
 };
 
+// Ignore server-side faults - like no auth credits on test objects
+function processFail(self, done){
+    return function(ex){
+        if (ex && ex.data && ex.data.response && ex.data.response.statusCode){
+            var status = ex.data.response.statusCode;
+            if (status === 0xa0d2){ // no credits for UO left.
+                self.skip();
+                return;
+            }
+        }
+
+        done(ex);
+    }
+}
+
 describe("Client", function() {
     // Retry all tests in this suite up to 5 times
     this.retries(3);
@@ -35,9 +50,7 @@ describe("Client", function() {
         promise.then(function(data){
             expect(eb.misc.inputToHex(data.data)).to.equal('95c6bb9b6a1c3835f98cc56087a03e82');
             done();
-        }).catch(function(e) {
-            done(e);
-        });
+        }).catch(processFail(this, done));
     });
 
     it("createUO", function(done){
@@ -90,9 +103,7 @@ describe("Client", function() {
             expect(data.result.handle).is.a('string');
             expect(data.result.handle).to.not.be.empty;
             done();
-        }).catch(function(e) {
-            done(e);
-        });
+        }).catch(processFail(this, done));
     });
 
 });
