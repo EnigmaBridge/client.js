@@ -15,7 +15,7 @@ shell.exec("cd ./node_modules/sjcl/ && make " +
     "&& cp sjcl.js ../../lib/built/sjcl/sjcl.js");
 
 // Browserify.
-shell.exec("./node_modules/.bin/browserify --exclude crypto --standalone eb " +
+shell.exec("mkdir -p dist/ && ./node_modules/.bin/browserify --exclude crypto --standalone eb " +
     "lib/enigma.js > dist/enigma.js");
 
 // Browserify + minify
