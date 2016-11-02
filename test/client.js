@@ -3,16 +3,19 @@ var expect = require("chai").expect;
 var eb = require("../lib/enigma");
 var sjcl = eb.misc.sjcl;
 
-var settings = {
-    host: "https://site2.enigmabridge.com:11180",
-    enrollHost: "https://site2.enigmabridge.com:11182",
-    requestMethod: "POST",
-    requestTimeout: 30000,
-    debuggingLog: false,
-    apiKey: "TEST_API",
+var config = new eb.client.Configuration({
+    endpointProcess: 'https://site2.enigmabridge.com:11180',
+    endpointEnroll: 'https://site2.enigmabridge.com:11182',
+    timeout: 30000,
+    apiKey: 'TEST_API',
     retry: {
         maxAttempts: 2
     }
+});
+
+var settings = {
+    debuggingLog: false,
+    config: config
 };
 
 // Ignore server-side faults - like no auth credits on test objects
@@ -37,7 +40,7 @@ describe("Client", function() {
 
     it("processData", function (done) {
         var input = '6bc1bee22e409f96e93d7e117393172a';
-        var cfg = eb.misc.extend(true, {}, settings, {
+        var cfg = eb.misc.extend(true, settings, {
             uoId: 'EE01',
             uoType: '4',
             aesKey: 'e134567890123456789012345678901234567890123456789012345678901234',
@@ -115,7 +118,6 @@ describe("Client", function() {
                 app:{
                     key:sjcl.random.randomWords(4)}
             },
-            host: settings.enrollHost,
             objType: eb.comm.createUO.consts.uoType.PLAINAESDECRYPT
         });
 
@@ -123,7 +125,6 @@ describe("Client", function() {
         var promise = cl.call();
 
         promise.then(function(data){
-            console.log(data);
             expect(data).to.exist;
             expect(data.result).to.exist;
             expect(data.result.handle).to.exist;
