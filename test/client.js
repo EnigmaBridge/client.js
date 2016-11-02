@@ -109,7 +109,7 @@ describe("Client", function() {
         }).catch(processFail(this, done));
     });
 
-    it("createUOSimple", function(done){
+    it("createUOSimpleAndUse", function(done){
         var cfg = eb.misc.extend(true, {}, settings, {
             tpl: {
                 "environment": eb.comm.createUO.consts.environment.DEV
@@ -130,7 +130,20 @@ describe("Client", function() {
             expect(data.result.handle).to.exist;
             expect(data.result.handle).is.a('string');
             expect(data.result.handle).to.not.be.empty;
-            done();
+
+            // Try to process data
+            var aes = new sjcl.cipher.aes(cfg.keys.app.key);
+            var input2 = '6bc1bee22e409f96e93d7e117393172a';
+            var cfg2 = eb.misc.extend(true, {}, data);
+            var cl2 = new eb.client.processData(cfg2);
+            var promise2 = cl2.call(input2);
+
+            promise2.then(function(data){
+                var desiredOutput = aes.decrypt(eb.misc.inputToBits(input2));
+                expect(data.data).to.deep.equal(desiredOutput);
+                done();
+            }).catch(processFail(this, done));
+
         }).catch(processFail(this, done));
     });
 
