@@ -106,5 +106,32 @@ describe("Client", function() {
         }).catch(processFail(this, done));
     });
 
+    it("createUOSimple", function(done){
+        var cfg = eb.misc.extend(true, {}, settings, {
+            tpl: {
+                "environment": eb.comm.createUO.consts.environment.DEV
+            },
+            keys: {
+                app:{
+                    key:sjcl.random.randomWords(4)}
+            },
+            host: settings.enrollHost,
+            objType: eb.comm.createUO.consts.uoType.PLAINAESDECRYPT
+        });
+
+        var cl = new eb.client.createUO(cfg);
+        var promise = cl.call();
+
+        promise.then(function(data){
+            console.log(data);
+            expect(data).to.exist;
+            expect(data.result).to.exist;
+            expect(data.result.handle).to.exist;
+            expect(data.result.handle).is.a('string');
+            expect(data.result.handle).to.not.be.empty;
+            done();
+        }).catch(processFail(this, done));
+    });
+
 });
 
