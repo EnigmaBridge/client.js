@@ -147,5 +147,33 @@ describe("Client", function() {
         }).catch(processFail(this, done));
     });
 
+    it("createRSAUOAndUse", function(done){
+        var cfg = eb.misc.extend(true, {}, settings, {
+            tpl: {
+                "environment": eb.comm.createUO.consts.environment.DEV
+            },
+            bits: 1024
+        });
+
+        var cl = new eb.client.createUO(cfg);
+        var promise = cl.createRSA();
+
+        promise.then(function(data){
+            checkHandle(data);
+            expect(data.rsaPrivateKey).to.exist;
+
+            // Try to process data - RSA decryption of zero vector.
+            var input2 = '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001';
+            var cfg2 = eb.misc.extend(true, {}, data);
+            var cl2 = new eb.client.processData(cfg2);
+
+            var promise2 = cl2.call(input2);
+            promise2.then(function(data){
+                expect(eb.misc.inputToHex(data.data)).to.deep.equal(input2);
+                done();
+            }).catch(processFail(this, done));
+
+        }).catch(processFail(this, done));
+    });
 });
 
