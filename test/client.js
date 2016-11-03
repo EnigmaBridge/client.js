@@ -119,8 +119,9 @@ describe("Client", function() {
                 "environment": eb.comm.createUO.consts.environment.DEV
             },
             keys: {
-                app:{
-                    key:sjcl.random.randomWords(4)}
+                app: {
+                    key: sjcl.random.randomWords(4)
+                }
             },
             objType: eb.comm.createUO.consts.uoType.PLAINAESDECRYPT
         });
@@ -162,7 +163,7 @@ describe("Client", function() {
             checkHandle(data);
             expect(data.rsaPrivateKey).to.exist;
 
-            // Try to process data - RSA decryption of zero vector.
+            // Try to process data - RSA decryption of the 00000..1
             var input2 = '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001';
             var cfg2 = eb.misc.extend(true, {}, data);
             var cl2 = new eb.client.processData(cfg2);
