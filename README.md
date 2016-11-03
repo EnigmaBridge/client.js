@@ -179,7 +179,7 @@ var cfg = {
 };
 
 var cl = new eb.client.createUO(cfg);
-var promise = cl.call();
+var promise = cl.createRSA();
 
 promise.then(function(data){
     // ProcessData demo: RSA decryption of the 00000..1
@@ -188,13 +188,13 @@ promise.then(function(data){
     var cfg2 = eb.misc.extend(true, {}, data);
     var cl2 = new eb.client.processData(cfg2);
 
+    // rsaPrivateKey object contains also the public part of
+    // the key: modulus and public exponent
+    console.log(data.rsaPrivateKey);
+
     var promise2 = cl2.call(input2);
     promise2.then(function(data){
         console.log(eb.misc.inputToHex(data.data));
-
-        // rsaPrivateKey object contains also the public part of
-        // the key: modulus and public exponent
-        console.log(data.rsaPrivateKey);
     }).catch(function(error){
         console.log(error);
     });
