@@ -207,6 +207,8 @@ promise.then(function(data){
 });
 ```
 
+For more usage examples please refer to tests and our [API documentation].
+
 ## CLI
 Example:
 
@@ -231,3 +233,5 @@ Example:
 [sjcl BitArray]: https://bitwiseshiftleft.github.io/sjcl/doc/symbols/sjcl.bitArray.html
 [jsbn]: https://github.com/andyperlitch/jsbn
 [Runkit]: https://runkit.com/npm/ebclient.js
+[API documentation]: https://api.enigmabridge.com/api/?python
+
