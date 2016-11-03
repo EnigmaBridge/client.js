@@ -136,7 +136,6 @@ promise.then(function(data){
         var desiredOutput = aes.decrypt(eb.misc.inputToBits(input2));
         console.log(eb.misc.inputToHex(data.data));
         console.log(eb.misc.inputToHex(desiredOutput));
-        done();
     }).catch(function(error){
         console.log(error);
     });
@@ -196,7 +195,6 @@ promise.then(function(data){
         // rsaPrivateKey object contains also the public part of
         // the key: modulus and public exponent
         console.log(data.rsaPrivateKey);
-        done();
     }).catch(function(error){
         console.log(error);
     });
