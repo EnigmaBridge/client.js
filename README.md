@@ -24,7 +24,10 @@ with convenience and ease. It works with Promise pattern.
 
 ## Examples
 
-The few basic examples for using this client for communication with EB.
+The few basic examples for using this client for communication with EnigmaBridge.
+
+You can test this client code and examples below online in the [Runkit] on NPM (platform for in-browser JavaScript
+ NodeJS prototyping).
 
 ### Process Data
 
@@ -227,3 +230,4 @@ Example:
 [sjcl]: https://github.com/bitwiseshiftleft/sjcl
 [sjcl BitArray]: https://bitwiseshiftleft.github.io/sjcl/doc/symbols/sjcl.bitArray.html
 [jsbn]: https://github.com/andyperlitch/jsbn
+[Runkit]: https://runkit.com/npm/ebclient.js
