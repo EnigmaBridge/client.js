@@ -3,16 +3,19 @@ var expect = require("chai").expect;
 var eb = require("../lib/enigma");
 var sjcl = eb.misc.sjcl;
 
-var settings = {
-    host: "https://site2.enigmabridge.com:11180",
-    enrollHost: "https://site2.enigmabridge.com:11182",
-    requestMethod: "POST",
-    requestTimeout: 30000,
-    debuggingLog: false,
-    apiKey: "TEST_API",
+var config = new eb.client.Configuration({
+    endpointProcess: 'https://site2.enigmabridge.com:11180',
+    endpointEnroll: 'https://site2.enigmabridge.com:11182',
+    timeout: 30000,
+    apiKey: 'TEST_API',
     retry: {
         maxAttempts: 2
     }
+});
+
+var settings = {
+    debuggingLog: false,
+    config: config
 };
 
 // Ignore server-side faults - like no auth credits on test objects
@@ -30,6 +33,14 @@ function processFail(self, done){
     }
 }
 
+function checkHandle(data){
+    expect(data).to.exist;
+    expect(data.result).to.exist;
+    expect(data.result.handle).to.exist;
+    expect(data.result.handle).is.a('string');
+    expect(data.result.handle).to.not.be.empty;
+}
+
 describe("Client", function() {
     // Retry all tests in this suite up to 5 times
     this.retries(3);
@@ -37,7 +48,7 @@ describe("Client", function() {
 
     it("processData", function (done) {
         var input = '6bc1bee22e409f96e93d7e117393172a';
-        var cfg = eb.misc.extend(true, {}, settings, {
+        var cfg = eb.misc.extend(true, settings, {
             uoId: 'EE01',
             uoType: '4',
             aesKey: 'e134567890123456789012345678901234567890123456789012345678901234',
@@ -97,14 +108,73 @@ describe("Client", function() {
         var promise = cl.call();
 
         promise.then(function(data){
-            expect(data).to.exist;
-            expect(data.result).to.exist;
-            expect(data.result.handle).to.exist;
-            expect(data.result.handle).is.a('string');
-            expect(data.result.handle).to.not.be.empty;
+            checkHandle(data);
             done();
         }).catch(processFail(this, done));
     });
 
+    it("createUOSimpleAndUse", function(done){
+        var cfg = eb.misc.extend(true, {}, settings, {
+            tpl: {
+                "environment": eb.comm.createUO.consts.environment.DEV
+            },
+            keys: {
+                app: {
+                    key: sjcl.random.randomWords(4)
+                }
+            },
+            objType: eb.comm.createUO.consts.uoType.PLAINAESDECRYPT
+        });
+
+        var cl = new eb.client.createUO(cfg);
+        var promise = cl.call();
+
+        promise.then(function(data){
+            checkHandle(data);
+
+            // Try to process data
+            var aes = new sjcl.cipher.aes(cfg.keys.app.key);
+            var input2 = '6bc1bee22e409f96e93d7e117393172a';
+            var cfg2 = eb.misc.extend(true, {}, data);
+            var cl2 = new eb.client.processData(cfg2);
+            var promise2 = cl2.call(input2);
+
+            promise2.then(function(data){
+                var desiredOutput = aes.decrypt(eb.misc.inputToBits(input2));
+                expect(data.data).to.deep.equal(desiredOutput);
+                done();
+            }).catch(processFail(this, done));
+
+        }).catch(processFail(this, done));
+    });
+
+    it("createRSAUOAndUse", function(done){
+        var cfg = eb.misc.extend(true, {}, settings, {
+            tpl: {
+                "environment": eb.comm.createUO.consts.environment.DEV
+            },
+            bits: 1024
+        });
+
+        var cl = new eb.client.createUO(cfg);
+        var promise = cl.createRSA();
+
+        promise.then(function(data){
+            checkHandle(data);
+            expect(data.rsaPrivateKey).to.exist;
+
+            // Try to process data - RSA decryption of the 00000..1
+            var input2 = '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001';
+            var cfg2 = eb.misc.extend(true, {}, data);
+            var cl2 = new eb.client.processData(cfg2);
+
+            var promise2 = cl2.call(input2);
+            promise2.then(function(data){
+                expect(eb.misc.inputToHex(data.data)).to.deep.equal(input2);
+                done();
+            }).catch(processFail(this, done));
+
+        }).catch(processFail(this, done));
+    });
 });
 
