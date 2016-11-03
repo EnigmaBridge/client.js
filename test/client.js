@@ -33,6 +33,14 @@ function processFail(self, done){
     }
 }
 
+function checkHandle(data){
+    expect(data).to.exist;
+    expect(data.result).to.exist;
+    expect(data.result.handle).to.exist;
+    expect(data.result.handle).is.a('string');
+    expect(data.result.handle).to.not.be.empty;
+}
+
 describe("Client", function() {
     // Retry all tests in this suite up to 5 times
     this.retries(3);
@@ -100,11 +108,7 @@ describe("Client", function() {
         var promise = cl.call();
 
         promise.then(function(data){
-            expect(data).to.exist;
-            expect(data.result).to.exist;
-            expect(data.result.handle).to.exist;
-            expect(data.result.handle).is.a('string');
-            expect(data.result.handle).to.not.be.empty;
+            checkHandle(data);
             done();
         }).catch(processFail(this, done));
     });
@@ -125,11 +129,7 @@ describe("Client", function() {
         var promise = cl.call();
 
         promise.then(function(data){
-            expect(data).to.exist;
-            expect(data.result).to.exist;
-            expect(data.result.handle).to.exist;
-            expect(data.result.handle).is.a('string');
-            expect(data.result.handle).to.not.be.empty;
+            checkHandle(data);
 
             // Try to process data
             var aes = new sjcl.cipher.aes(cfg.keys.app.key);
