@@ -83,6 +83,8 @@ thus nobody can steal it from you - it never leaves the secure hardware.
 In the example below we create a new AES-128 key in the client and we import the key to the EnigmaBridge.
 The result is a new User Object which internally contains the AES-128 bit key and allows to perform a decryption with the key.
 
+When the key is created it is used in the ProcessData call to demonstrate how to use newly generated user object.
+
 ```javascript
 "use strict";
 var eb = require("ebclient.js");
@@ -147,6 +149,8 @@ promise.then(function(data){
 
 In this example we create a new RSA private key right in the secure hardware without exposing the value.
 The createRSA call also returns the public key part - the public modulus and the public exponent.
+
+When the key is created it is used in the ProcessData call to demonstrate how to use newly generated user object.
 
 ```javascript
 "use strict";
@@ -214,7 +218,7 @@ Example:
  [sjcl BitArray], which is a simple array of 32 bit words (integers).
 * [jsbn] library for big number computation - mainly RSA encryption used in the createUO.
 * superagent for REST calls
-* extend polyfil for `$.extend`
+* extend polyfil for `$.extend()`
 * bluebird for Promises
 
 
