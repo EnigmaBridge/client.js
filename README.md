@@ -134,7 +134,8 @@ promise.then(function(data){
 
     promise2.then(function(data){
         var desiredOutput = aes.decrypt(eb.misc.inputToBits(input2));
-        expect(data.data).to.deep.equal(desiredOutput);
+        console.log(eb.misc.inputToHex(data.data));
+        console.log(eb.misc.inputToHex(desiredOutput));
         done();
     }).catch(function(error){
         console.log(error);
