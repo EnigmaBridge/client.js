@@ -208,6 +208,19 @@ Example:
 ./bin/eb.js -p '{"host":"https://site2.enigmabridge.com:11180", "apiKey": "TEST_API", "uoId": "ee01", "aesKey":"e134567890123456789012345678901234567890123456789012345678901234", "macKey":"e224262820223456789012345678901234567890123456789012345678901234", "input":"6bc1bee22e409f96e93d7e117393172a"}'
 ```
 
+## Libraries
+
+* [sjcl] is the main crypto library used. Data format in the input/output of the library is usually a hexcoded string or
+ [sjcl BitArray], which is a simple array of 32 bit words (integers).
+* [jsbn] library for big number computation - mainly RSA encryption used in the createUO.
+* superagent for REST calls
+* extend polyfil for `$.extend`
+* bluebird for Promises
+
+
 [Enigma Bridge]: https://www.enigmabridge.com
 [client.js-demo]: https://github.com/EnigmaBridge/client.js-demo
 [Expert API page]: https://expert.enigmabridge.com/test/
+[sjcl]: https://github.com/bitwiseshiftleft/sjcl
+[sjcl BitArray]: https://bitwiseshiftleft.github.io/sjcl/doc/symbols/sjcl.bitArray.html
+[jsbn]: https://github.com/andyperlitch/jsbn
