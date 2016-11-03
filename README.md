@@ -12,7 +12,9 @@ npm install ebclient.js
 
 ## Usage
 
-The `client.js` can be used either in NodeJS v0.12 - v6 or in the browser (packaged by browserify).
+The `ebclient.js` can be used either in NodeJS v0.12 - v6 or in the browser (packaged by browserify). For more
+information how to use `ebclient.js` in the browser please take a look at [client.js-demo] repository.
+You can also test the API on our [Expert API page].
 
 There are few levels of the API, `eb.comm` is the low level API with additional complexity, with low level requests, etc..
 You probably won't need to touch this.
@@ -207,3 +209,5 @@ Example:
 ```
 
 [Enigma Bridge]: https://www.enigmabridge.com
+[client.js-demo]: https://github.com/EnigmaBridge/client.js-demo
+[Expert API page]: https://expert.enigmabridge.com/test/
