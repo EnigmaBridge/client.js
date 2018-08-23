@@ -1,6 +1,6 @@
 {
   "name": "ebclient",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": {
     "name": "Smart Architects",
     "email": "support@smartarchitects.co.uk",
@@ -68,6 +68,7 @@
     "clean": "rimraf dist/*",
     "prebuild": "npm run clean -s",
     "postbuild": "npm run test",
+    "postbuild": { "should": "*" },
     "build": "build/build.js",
     "test": "./node_modules/mocha/bin/mocha",
     "lint": "./node_modules/eslint/bin/eslint.js lib test",
