@@ -1,9 +1,9 @@
 {
-  "name": "ebclient.js",
-  "version": "0.1.14",
+  "name": "ebclient",
+  "version": "1.0.0",
   "author": {
-    "name": "Dusan Klinec",
-    "email": "dusan@enigmabridge.com",
+    "name": "Smart Architects",
+    "email": "support@smartarchitects.co.uk",
     "url": "https://enigmabridge.com/"
   },
   "description": "Client library for using EnigmaBridge crypto services",
@@ -42,16 +42,16 @@
     "bluebird": "^3.4.6",
     "commander": "^2.9.0",
     "extend": "^3.0.0",
-    "jsbn": "^0.1.0",
-    "sjcl": "^1.0.3",
-    "superagent": "^2.2.0",
+    "jsbn": "^1.1.0",
+    "sjcl": "^1.0.7",
+    "superagent": "^3.8.3",
     "url": "^0.11.0"
   },
   "devDependencies": {
     "browserify": "latest",
     "chai": "latest",
-    "eslint": "^0.21.2",
-    "google-closure-compiler": "^20160911.0.0",
+    "eslint": "^5.4.0",
+    "google-closure-compiler": "^20180805.0.0",
     "grunt": "*",
     "grunt-browserify": "*",
     "grunt-contrib-uglify": "*",
@@ -59,7 +59,8 @@
     "jshint": "latest",
     "minifyify": "latest",
     "mocha": "latest",
-    "rimraf": "latest",
+    "publish-please": "^3.2.0",
+    "rimraf": "^2.6.2",
     "shelljs": "^0.7.4",
     "watch": "latest"
   },
@@ -70,16 +71,17 @@
     "build": "build/build.js",
     "test": "./node_modules/mocha/bin/mocha",
     "lint": "./node_modules/eslint/bin/eslint.js lib test",
-    "prepublish": "npm run build"
+    "prepublish": "publish-please guard && npm run build",
+    "publish-please": "publish-please"
   },
   "_npmUser": {
-    "name": "ph4r05",
-    "email": "dusan.klinec@gmail.com"
+    "name": "smartarcs",
+    "email": "support@smartarchitects.co.uk"
   },
   "maintainers": [
     {
-      "name": "ph4r05",
-      "email": "ph4r05@gmail.com"
+      "name": "smartarcs",
+      "email": "support@smartarchitects.co.uk"
     }
   ]
 }
